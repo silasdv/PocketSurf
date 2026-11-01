@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.2.4
+- Fix controller-confirm activation in mouse mode: send paired native tap events instead of incomplete mouse button events.
+- Keep real mouse hover and restore it after activation without changing the input mode.
+- Add an end-to-end controller-input regression for the native WebView event path.
+
 ## 1.2.3 — 1 November 2026
 
 - Distribute available width across all visible tabs in title, compact and overflow modes.

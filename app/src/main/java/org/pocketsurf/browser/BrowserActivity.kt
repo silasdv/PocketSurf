@@ -814,7 +814,7 @@ open class BrowserActivity : Activity() {
   when(action){
    Control.UP->navigate("up",source);Control.DOWN->navigate("down",source);Control.LEFT->navigate("left",source);Control.RIGHT->navigate("right",source)
    Control.BACK->back()
-   Control.CONFIRM->{if(addressEditing||screen!="page"||tab==null||tab?.home==true||tab?.loadError!=null||chromeFocus){activateNative()}else if(mouse){clickAt(pointerX,pointerY);handler.postDelayed({checkWebEditing()},60)}else activateElement()}
+   Control.CONFIRM->{if(addressEditing||screen!="page"||tab==null||tab?.home==true||tab?.loadError!=null||chromeFocus){activateNative()}else if(mouse){clickAt(pointerX,pointerY)}else activateElement()}
    Control.TABS->{if(screen=="tabs")back()else showTabs()}
    Control.CONTEXT->{if(screen in listOf("page","tabs"))newTab()}
    Control.SEARCH->{if(screen=="page"){if(addressEditing){addressField.requestFocus();addressField.selectAll()}else focusChrome()}else if(screen=="tabs")queryField?.let{nativeTyping=false;imeExpected=false;focused=it;it.requestFocus()}}
@@ -921,7 +921,7 @@ open class BrowserActivity : Activity() {
  private fun lease():PageLease? {val t=tab?:return null;val v=t.view?:return null;return PageLease(t,v,t.generation,interactionEpoch)}
  private fun valid(p:PageLease)=resumed&&screen=="page"&&tab===p.target&&web===p.view&&p.generation==p.target.generation&&p.epoch==interactionEpoch&&!addressEditing&&popupLayer==null
  private fun activateElement(){val p=lease()?:return;p.view.evaluateJavascript("window.__pocketSurf ? window.__pocketSurf.activationPoint() : null"){value->if(valid(p))try{val o=JSONObject(value);val ratio=p.view.width/o.getDouble("width");if(o.optBoolean("editable")){webEditing=true;p.target.formProtected=true;imeExpected=true;stopInput()};clickAt((o.getDouble("x")*ratio).toFloat(),(o.getDouble("y")*ratio).toFloat())}catch(_:Exception){}}}
- private fun clickAt(x:Float,y:Float){val v=web?:return;if(mouse){hover.click(v,x,y);return};val now=SystemClock.uptimeMillis();for(action in listOf(MotionEvent.ACTION_DOWN,MotionEvent.ACTION_UP)){val e=MotionEvent.obtain(now,now,action,x,y,0);v.dispatchTouchEvent(e);e.recycle()}}
+ private fun clickAt(x:Float,y:Float){val v=web?:return;if(mouse){val p=lease()?:return;v.evaluateJavascript("window.__pocketSurf && window.__pocketSurf.prepareClick()"){if(valid(p)&&mouse&&!touchMode){hover.click(v,x,y);handler.postDelayed({checkWebEditing()},60)}};return};val now=SystemClock.uptimeMillis();for(action in listOf(MotionEvent.ACTION_DOWN,MotionEvent.ACTION_UP)){val e=MotionEvent.obtain(now,now,action,x,y,0);v.dispatchTouchEvent(e);e.recycle()}}
  private fun showPageContext(){showMenu()}
  private fun contextMenu(){contextMenu(null)}
  private fun contextMenu(point:FloatArray?){
