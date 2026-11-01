@@ -6,18 +6,20 @@
 
 PocketSurf by **SilasDV** brings desktop-style tabs, a compact top address bar, D-pad navigation, mouse mode and right-stick scrolling to devices such as the Retroid Pocket 6. It uses the installed Android System WebView.
 
-**Version 1.2.0 · Android 8.0+ · No root or Shizuku required**
+**Version 1.2.1 · Android 8.0+ · No root or Shizuku required**
 
-[Download APK](https://github.com/silasdv/PocketSurf/releases/download/v1.2.0/PocketSurf-1.2.0.apk) · [Release notes](docs/RELEASE-1.2.0.md) · [Changelog](CHANGELOG.md)
+[Download APK](https://github.com/silasdv/PocketSurf/releases/download/v1.2.1/PocketSurf-1.2.1.apk) · [Release notes](docs/RELEASE-1.2.1.md) · [Changelog](CHANGELOG.md)
 
 ## Install or update
 
-1. Download **PocketSurf-1.2.0.apk** from the [official release](https://github.com/silasdv/PocketSurf/releases/tag/v1.2.0) and install it.
+1. Download **PocketSurf-1.2.1.apk** from the [official release](https://github.com/silasdv/PocketSurf/releases/tag/v1.2.1) and install it.
 2. Choose a search engine and optionally pin websites in the two-page setup. Google is the default. Setup can be skipped and reopened in About.
 3. Use touch or a controller. Open the top-right gear or press Start for Settings; remap actions under Controller and adjust the pointer under Mouse.
 4. Choose a theme and accent, optionally enable the bookmarks bar, and use About to open Android's default-browser chooser.
 
 **Earlier local test APKs:** this public release uses a dedicated release key. Android cannot update a development-signed installation with it. Export bookmarks/settings through **Settings > Backup and restore** before uninstalling a test build; uninstalling clears its data. Restore the JSON after installing the release. Cookies, history and open tabs are not included in that backup. Future public releases must retain this signing identity.
+
+A launcher start opens a fresh tab while retaining existing tabs. Share and Reload stay visible and dimmed on the new-tab page.
 
 ## Features
 

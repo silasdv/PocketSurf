@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.2.1 — 1 November 2026
+
+- Open and select a fresh tab on launcher start/re-entry, retaining existing tabs.
+- Avoid extra tabs on Activity recreation and when directly opening an external link.
+- Keep Share and Reload visible, disabled and dimmed on the new-tab page; enable them again for websites.
+
 ## 1.2.0 — 1 November 2026
 
 First consolidated public release, following local development through 1.1.9.
