@@ -41,6 +41,8 @@ open class BrowserActivity : Activity() {
  private val handler=Handler(Looper.getMainLooper())
  private val deviceListener=object:android.hardware.input.InputManager.InputDeviceListener {override fun onInputDeviceAdded(id:Int){stopInput()};override fun onInputDeviceChanged(id:Int){stopInput()};override fun onInputDeviceRemoved(id:Int){stopInput()}}
  private val tabs=mutableListOf<Tab>()
+ private val popupParents=java.util.concurrent.ConcurrentHashMap<String,String>()
+ private val popupOrigins=java.util.concurrent.ConcurrentHashMap<String,String>()
  private val closed=ArrayDeque<Tab>()
  private val hover=MouseHoverDispatcher()
  private var interactionEpoch=0L
@@ -701,10 +703,10 @@ open class BrowserActivity : Activity() {
    "Touch and known limits" to "Use the tab strip, address bar, menu icons and on-screen Back controls directly. Menus scroll normally by touch. Cross-origin frames, canvas content and some custom controls may need Mouse mode. Camera and microphone requests ask per page visit and also need Android permission.").forEach{(title,copy)->body.addView(text(title,17f,bold=true),margin(-1,-2,top=14,bottom=8));body.addView(text(copy,14f,theme.secondary).apply{setLineSpacing(dp(3).toFloat(),1f)},margin(-1,-2,bottom=12))};focusFirst()
  }
  private fun userAgent()=web?.settings?.userAgentString?:WebSettings.getDefaultUserAgent(this)
- private fun download(url:String,ua:String=userAgent(),disposition:String?=null,mime:String?=null){
+ private fun download(url:String,ua:String=userAgent(),disposition:String?=null,mime:String?=null,referer:String=web?.url.orEmpty()){
   if(url.startsWith("blob:")||url.startsWith("data:")){if(!resumed||pendingGenerated!=null){toast("Finish the current file selection first");return};val p=lease()?:return;val origin=PageIdentity.origin(p.target.url)?:return;if(url.startsWith("blob:")&&!url.startsWith("blob:$origin/")){toast("Generated file belongs to another website");return};if(url.startsWith("data:")&&url.length>524288){toast("Embedded file address is too large; use the website's normal download link");return};val type=mime?:"application/octet-stream";val name=URLUtil.guessFileName(url,disposition,type).replace(Regex("[\\\\/:*?\"<>|]"),"_").take(120);pendingGenerated=PendingGenerated(p,url,name,type);startActivityForResult(Intent(Intent.ACTION_CREATE_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType(type).putExtra(Intent.EXTRA_TITLE,name),74);return}
-  try {downloads.start(url,ua,disposition,mime,PageIdentity.referer(web?.url.orEmpty(),url));downloadProblem=null;downloadRetry=null;if(screen=="downloads")nativeBody?.let{renderDownloads(it)}else toast("Download started · available in Downloads")}
-  catch(e:Exception){downloadProblem=if(e is IllegalArgumentException)"This download type is not supported. Try a direct HTTP or HTTPS file link from the website."else"The download could not start. Check your connection and free storage, then try again.";downloadRetry=if(e is IllegalArgumentException)null else ({download(url,ua,disposition,mime)});showDownloads{showPage()}}
+  try {downloads.start(url,ua,disposition,mime,PageIdentity.referer(referer,url));downloadProblem=null;downloadRetry=null;if(screen=="downloads")nativeBody?.let{renderDownloads(it)}else toast("Download started · available in Downloads")}
+  catch(e:Exception){downloadProblem=if(e is IllegalArgumentException)"This download type is not supported. Try a direct HTTP or HTTPS file link from the website."else"The download could not start. Check your connection and free storage, then try again.";downloadRetry=if(e is IllegalArgumentException)null else ({download(url,ua,disposition,mime,referer)});showDownloads{showPage()}}
  }
  private fun showTabs(){tabQuery="";capturePreview();returnFromTabs=tab;selected=active.coerceAtLeast(0);renderTabs()}
  private fun renderTabs(focusTabAfterClose:Int?=null){
@@ -745,7 +747,7 @@ open class BrowserActivity : Activity() {
  private fun showClosed(){val body=screen("closed","Recently closed","Restore the pages you closed",{renderTabs()});if(closed.isEmpty())body.addView(emptyState("No recently closed tabs","Closed tabs from this session appear here."))else menuGrid(body,closed.reversed().map{t->MenuItem("history",t.title,host(t.url)){closed.remove(t);lastClosedBatch=lastClosedBatch.filter{it.id!=t.id};tabs.add((active+1).coerceIn(0,tabs.size),t.copy(view=null,state=null,restoreScroll=true));active=(active+1).coerceAtMost(tabs.lastIndex);showPage()}},1)}
  private fun newTab(){capturePreview();stopInput();tabs.add((active+1).coerceIn(0,tabs.size),if(homeStore.homeMode=="custom")Tab(url=homeStore.homeUrl,title=host(homeStore.homeUrl),home=false)else Tab());active=(active+1).coerceAtMost(tabs.lastIndex);showPage();if(tab?.home==true)focusChrome();animateArrival(content)}
  private fun switchTab(index:Int){if(index !in tabs.indices)return;if(index==active&&screen=="page")return;tab?.let{t->captureTab(t);val v=t.view;val generation=t.generation;v?.evaluateJavascript("Array.from(document.querySelectorAll('video,audio')).some(m=>!m.paused&&!m.ended)"){value->if(t.view===v&&t.generation==generation)t.mediaProtected=value=="true"}};capturePreview();stopInput();web?.evaluateJavascript("window.__pocketSurf && window.__pocketSurf.suspendSelection()",null);web?.onPause();active=index;showPage();evict()}
- private fun closeTab(index:Int,overview:Boolean){if(index in tabs.indices){stopInput();destroyTab(index,overview)}}
+ private fun closeTab(index:Int,overview:Boolean){if(index in tabs.indices){val id=tabs[index].id;popupParents.remove(id);popupOrigins.remove(id);stopInput();destroyTab(index,overview)}}
  private fun destroyTab(index:Int,overview:Boolean){if(index !in tabs.indices)return;val old=tab;val t=tabs[index];if(t.transferActive)generatedTransfer?.close();captureTab(t);tabs.removeAt(index);lastClosedActive=old?.id.orEmpty();lastClosedBatch=listOf(t.copy(view=null,state=null,preview=null));closed.addLast(t.copy(view=null,state=null,preview=null));while(closed.size>500)closed.removeFirst();(t.view?.parent as? ViewGroup)?.removeView(t.view);t.view?.destroy();active=if(tabs.isEmpty())-1 else if(old===t)index.coerceAtMost(tabs.lastIndex)else tabs.indexOf(old).coerceAtLeast(0);selected=index.coerceAtMost(max(0,tabs.lastIndex));saveSession();if(overview)renderTabs(selected)else showPage()}
  private fun openUrl(url:String,new:Boolean=false){
   hideKeyboard();if(new||tab==null)newTab();val t=tab?:return;val needsNavigation=t.view!=null||t.state!=null
@@ -754,7 +756,7 @@ open class BrowserActivity : Activity() {
   saveSession();evict()
  }
  private fun evict(){tabs.filter{it!==tab&&it.view!=null}.sortedWith(compareByDescending<Tab>{it.transferActive}.thenByDescending{it.formProtected||it.mediaProtected}.thenByDescending{it.lastUsed}).drop(2).forEach{t->captureTab(t);t.state=Bundle().also{t.view?.saveState(it)};t.restoreScroll=true;t.view?.destroy();t.view=null}}
- private fun pageBack(){val t=tab?:return;if(t.home)return;if(t.manualHistory&&t.trailIndex>0){t.trailIndex--;t.historyReplay=true;t.restoreScroll=false;t.view?.loadUrl(t.trail[t.trailIndex]);updateNavigationState();return};val v=t.view;if(v?.canGoBack()==true){if(t.loadError!=null){t.loadError=null;showPage()};v.goBack()}else {t.home=true;showPage()};updateChrome()}
+ private fun pageBack(){val t=tab?:return;if(t.home)return;if(t.manualHistory&&t.trailIndex>0){t.trailIndex--;t.historyReplay=true;t.restoreScroll=false;t.view?.loadUrl(t.trail[t.trailIndex]);updateNavigationState();return};val v=t.view;if(v?.canGoBack()==true){if(t.loadError!=null){t.loadError=null;showPage()};v.goBack()}else {val opener=popupParents.remove(t.id);val parent=tabs.indexOfFirst{it.id==opener};if(parent>=0){closeTab(active,false);val restored=tabs.indexOfFirst{it.id==opener};if(restored>=0)switchTab(restored)}else{t.home=true;showPage()}};updateChrome()}
  private fun pageForward(){val t=tab?:return;if(t.manualHistory&&t.trailIndex<t.trail.lastIndex){t.trailIndex++;t.historyReplay=true;t.restoreScroll=false;t.view?.loadUrl(t.trail[t.trailIndex]);updateNavigationState();return};if(t.home&&t.url.isNotBlank()){t.home=false;showPage()}else t.view?.takeIf{it.canGoForward()}?.let{if(t.loadError!=null){t.loadError=null;showPage()};it.goForward()};updateChrome()}
  private fun back(){
 
@@ -933,14 +935,14 @@ open class BrowserActivity : Activity() {
   }catch(_:Exception){showPageContext()}}
  }
 
- private fun makeWeb(t:Tab)=WebView(this).apply {
+ private fun makeWeb(t:Tab):WebView=WebView(this).apply {
   t.previewReady=false
   settings.textZoom=textZoom(t.url);settings.javaScriptEnabled=true;settings.domStorageEnabled=true;settings.allowFileAccess=false;settings.allowContentAccess=true;settings.mixedContentMode=WebSettings.MIXED_CONTENT_NEVER_ALLOW;settings.safeBrowsingEnabled=true
-  settings.setSupportZoom(true);settings.builtInZoomControls=true;settings.displayZoomControls=false;settings.mediaPlaybackRequiresUserGesture=true;settings.setSupportMultipleWindows(false)
+  settings.setSupportZoom(true);settings.builtInZoomControls=true;settings.displayZoomControls=false;settings.mediaPlaybackRequiresUserGesture=true;settings.setSupportMultipleWindows(true);settings.javaScriptCanOpenWindowsAutomatically=false
   setFindListener{index,total,done->if(this===web&&::findCount.isInitialized&&findBar.visibility==View.VISIBLE){findCount.text=if(total>0)"${index+1}/$total"else"0/0";findCount.contentDescription="Match count";if(Build.VERSION.SDK_INT>=30)findCount.stateDescription=findCount.text.toString()}}
   importantForAutofill=if(isPrivateSession)View.IMPORTANT_FOR_AUTOFILL_NO_EXCLUDE_DESCENDANTS else View.IMPORTANT_FOR_AUTOFILL_YES;CookieManager.getInstance().setAcceptThirdPartyCookies(this,false)
   webViewClient=object:WebViewClient(){
-   override fun shouldInterceptRequest(v:WebView,r:WebResourceRequest):WebResourceResponse?=if(adblock.shouldBlock(r.url.toString(),t.url,r.isForMainFrame))WebResourceResponse("text/plain","UTF-8",java.io.ByteArrayInputStream(ByteArray(0)))else null
+   override fun shouldInterceptRequest(v:WebView,r:WebResourceRequest):WebResourceResponse?=if(adblock.shouldBlock(r.url.toString(),popupOrigins[t.id]?:t.url,r.isForMainFrame&&!popupOrigins.containsKey(t.id)))WebResourceResponse("text/plain","UTF-8",java.io.ByteArrayInputStream(ByteArray(0)))else null
    override fun shouldOverrideUrlLoading(v:WebView,r:WebResourceRequest):Boolean {if(r.url.scheme in listOf("http","https"))return false;if(r.isForMainFrame&&r.hasGesture())confirm("Open external app?","This link uses ${r.url.scheme}.",{showPage();try {startActivity(Intent(Intent.ACTION_VIEW,r.url).addCategory(Intent.CATEGORY_BROWSABLE))}catch(_:Exception){toast("No app can open this link")}},{showPage()},"Open app");return true}
    override fun onPageCommitVisible(v:WebView,url:String){t.previewReady=true}
    override fun onPageStarted(v:WebView,url:String,favicon:Bitmap?){t.generation++;t.previewReady=false;t.preview=null;t.formProtected=false;t.mediaProtected=false;if(t.transferActive)generatedTransfer?.close();if(t===tab){val held=controller.axes;val permission=pendingPermission;pendingPermission=null;if(permission!=null){prompt?.dismiss();prompt=null;permission.deny()};interactionEpoch++;hover.leave();if(t.manualHistory){if(t.historyReplay){if(t.trail.isNotEmpty())t.trail[t.trailIndex]=url}else if(t.trail.getOrNull(t.trailIndex)!=url){while(t.trail.size>t.trailIndex+1)t.trail.removeAt(t.trail.lastIndex);t.trail.add(url);t.trailIndex=t.trail.lastIndex}};webEditing=false;nativeTyping=false;webHasSelection=false;if(!addressEditing)imeExpected=false;stopInput();if(screen=="page"&&!addressEditing)controller.update(ControllerInput.Axes(rightX=held.rightX,rightY=held.rightY),SystemClock.uptimeMillis(),mouse,{},{})};val wasError=t.loadError!=null;t.url=url;t.home=false;t.loadError=null;t.progress=0;if(t===tab&&screen=="page"){if(wasError)showPage()else{if(!addressEditing)focusPageNeutral();updateChrome()}}}
@@ -951,6 +953,18 @@ open class BrowserActivity : Activity() {
    override fun onRenderProcessGone(v:WebView,d:RenderProcessGoneDetail):Boolean {(v.parent as? ViewGroup)?.removeView(v);v.destroy();t.view=null;t.state=null;pageProblem(t,"This page stopped responding. Try again to reload it, or return to the start page.");return true}
   }
   webChromeClient=object:WebChromeClient(){
+   override fun onCreateWindow(v:WebView,dialog:Boolean,userGesture:Boolean,message:android.os.Message):Boolean {
+    if(!userGesture||t!==tab||!resumed)return false
+    val transport=message.obj as? WebView.WebViewTransport?:return false
+    capturePreview();stopInput()
+    val child=Tab(url="about:blank",title="New tab",home=false)
+    child.view=makeWeb(child)
+    tabs.add((active+1).coerceIn(0,tabs.size),child);active=tabs.indexOf(child)
+    popupParents[child.id]=t.id;popupOrigins[child.id]=t.url
+    showPage();saveSession()
+    transport.webView=child.view;message.sendToTarget();evict();return true
+   }
+   override fun onCloseWindow(window:WebView){val opener=popupParents[t.id]?:return;val index=tabs.indexOf(t);val wasActive=t===tab;if(index>=0){closeTab(index,false);val parent=tabs.indexOfFirst{it.id==opener};if(wasActive&&parent>=0)switchTab(parent)}}
    override fun onProgressChanged(v:WebView,p:Int){t.progress=p;if(t===tab&&screen=="page")updateNavigationState()}
    override fun onReceivedIcon(v:WebView,bitmap:Bitmap){favicons.put(t.url,bitmap);refreshSiteIcons()}
    override fun onReceivedTitle(v:WebView,title:String){if(t.loadError==null){t.title=title;if(t===tab&&screen=="page")updateChrome()}}
@@ -963,7 +977,7 @@ open class BrowserActivity : Activity() {
    override fun onJsConfirm(v:WebView,url:String,message:String,r:JsResult):Boolean {showWebPrompt(url,message,{r.confirm()},{r.cancel()});return true}
    override fun onJsBeforeUnload(v:WebView,url:String,message:String,r:JsResult):Boolean {showWebPrompt(url,message,{r.confirm()},{r.cancel()});return true}
   }
-  setDownloadListener{url,ua,disposition,mime,_->download(url,ua,disposition,mime)}
+  setDownloadListener{url,ua,disposition,mime,_->download(url,ua,disposition,mime,popupOrigins[t.id]?:this.url.orEmpty())}
   var touchPoint=floatArrayOf(0f,0f,1f);setOnTouchListener{_,event->if(event.actionMasked==MotionEvent.ACTION_DOWN)touchPoint=floatArrayOf(event.x,event.y,width.toFloat().coerceAtLeast(1f));false}
   setOnLongClickListener {val hit=hitTestResult;if(hit.type==WebView.HitTestResult.EDIT_TEXT_TYPE)false else{if(hit.type in listOf(WebView.HitTestResult.SRC_ANCHOR_TYPE,WebView.HitTestResult.IMAGE_TYPE,WebView.HitTestResult.SRC_IMAGE_ANCHOR_TYPE))contextMenu(touchPoint)else showMenu();true}}
  }

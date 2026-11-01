@@ -18,14 +18,14 @@ class SurfDownloads(private val context:Context){
  private fun save(items:List<SurfDownload>){val a=JSONArray();items.forEach {a.put(JSONObject().put("id",it.id).put("url",it.url).put("name",it.name).put("mime",it.mime).put("time",it.time).put("status",it.status).put("received",it.received).put("total",it.total).put("reason",it.reason).put("localUri",it.localUri).put("referer",it.referer))};prefs.edit().putString("items",a.toString()).apply()}
  fun start(url:String,userAgent:String,disposition:String?=null,mime:String?=null,referer:String?=null):SurfDownload {
   require(Uri.parse(url).scheme in listOf("http","https")){"This download type is not supported"}
-  val name=URLUtil.guessFileName(url,disposition,mime).replace(Regex("[\\\\/:*?\"<>|]"),"_")
+  val name=DownloadMetadata.name(url,disposition,mime);val resolvedMime=DownloadMetadata.mime(name,mime)
   val stamp=System.currentTimeMillis();val dot=name.lastIndexOf('.');val unique=if(dot>0)name.substring(0,dot)+"-$stamp"+name.substring(dot)else "$name-$stamp"
   val request=DownloadManager.Request(Uri.parse(url)).setTitle(name).setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED).addRequestHeader("User-Agent",userAgent)
-  if(!mime.isNullOrBlank())request.setMimeType(mime)
+  request.setMimeType(resolvedMime)
   if(referer!=null&&!(referer.startsWith("https://")&&url.startsWith("http://")))request.addRequestHeader("Referer",referer)
   CookieManager.getInstance().getCookie(url)?.let {request.addRequestHeader("Cookie",it)}
   if(Build.VERSION.SDK_INT>=29)request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS,unique)else request.setDestinationInExternalFilesDir(context,Environment.DIRECTORY_DOWNLOADS,unique)
-  val item=SurfDownload(manager.enqueue(request),url,name,mime.orEmpty(),stamp,DownloadManager.STATUS_PENDING,referer=referer.orEmpty());save(listOf(item)+stored());return item
+  val item=SurfDownload(manager.enqueue(request),url,name,resolvedMime,stamp,DownloadManager.STATUS_PENDING,referer=referer.orEmpty());save(listOf(item)+stored());return item
  }
  fun items():List<SurfDownload> = stored().map {item->
   if(item.status==CANCELLED||item.localUri.isNotBlank())return@map item
@@ -40,7 +40,7 @@ class SurfDownloads(private val context:Context){
   if(items().firstOrNull{it.id==id}?.localUri.isNullOrBlank())manager.remove(id);save(stored().map {if(it.id==id)it.copy(status=CANCELLED)else it});return true
  }
  fun retry(item:SurfDownload,ua:String){start(item.url,ua,mime=item.mime,referer=item.referer.ifBlank{null});save(stored().filter{it.id!=item.id});manager.remove(item.id)}
- fun open(item:SurfDownload){if(item.localUri.isNotBlank()){context.startActivity(Intent(Intent.ACTION_VIEW).setDataAndType(Uri.parse(item.localUri),item.mime.ifBlank{"application/octet-stream"}).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION));return};val uri=manager.getUriForDownloadedFile(item.id)?:throw IllegalStateException("Downloaded file is no longer available");val mime=manager.getMimeTypeForDownloadedFile(item.id)?:"application/octet-stream";context.startActivity(Intent(Intent.ACTION_VIEW).setDataAndType(uri,mime).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION))}
+ fun open(item:SurfDownload){if(item.localUri.isNotBlank()){context.startActivity(Intent(Intent.ACTION_VIEW).setDataAndType(Uri.parse(item.localUri),item.mime.ifBlank{"application/octet-stream"}).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION));return};val uri=manager.getUriForDownloadedFile(item.id)?:throw IllegalStateException("Downloaded file is no longer available");val mime=DownloadMetadata.mime(item.name,item.mime.ifBlank{manager.getMimeTypeForDownloadedFile(item.id).orEmpty()});context.startActivity(Intent(Intent.ACTION_VIEW).setDataAndType(uri,mime).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION))}
  fun generated(url:String,name:String,mime:String,uri:Uri):SurfDownload {val stamp=System.currentTimeMillis();val item=SurfDownload(-android.os.SystemClock.elapsedRealtimeNanos().coerceAtLeast(1000L),if(url.startsWith("data:"))"data:"else url,name,mime,stamp,DownloadManager.STATUS_RUNNING,localUri=uri.toString());save(listOf(item)+stored());return item}
  fun cancelled(id:Long)=stored().any{it.id==id&&it.status==CANCELLED}
  fun generatedProgress(id:Long,bytes:Long,complete:Boolean=false,failed:Boolean=false){save(stored().map{if(it.id==id&&it.status!=CANCELLED)it.copy(received=bytes,total=if(complete)bytes else 0,status=if(failed)DownloadManager.STATUS_FAILED else if(complete)DownloadManager.STATUS_SUCCESSFUL else DownloadManager.STATUS_RUNNING)else it})}

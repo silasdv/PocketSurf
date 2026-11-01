@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.2.5
+- Preserve download filename suffixes when servers report a generic MIME type, including APK, archive and ROM files.
+- Resolve APK opening to Android's package installer and declare the user-confirmed installation capability.
+- Reject unprompted new windows; keep user-opened windows in separate tabs with a return path to their opener.
+- Preserve native popup requests, including POST, and the source-page referer for popup downloads.
+
 ## 1.2.4
 - Fix controller-confirm activation in mouse mode: send paired native tap events instead of incomplete mouse button events.
 - Keep real mouse hover and restore it after activation without changing the input mode.
