@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.2.2 — 1 November 2026
+
+- Keep readable truncated titles for longer before switching to compact tabs.
+- Preserve fixed favicon and close-button insets in both title and compact modes.
+- Use smaller fixed-width compact tabs instead of wide empty cards, then +N overflow.
+- Account for actual tab-row padding, hint/close controls and New Tab width when planning available space.
+
 ## 1.2.1 — 1 November 2026
 
 - Open and select a fresh tab on launcher start/re-entry, retaining existing tabs.

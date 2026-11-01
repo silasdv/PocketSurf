@@ -6,13 +6,13 @@
 
 PocketSurf by **SilasDV** brings desktop-style tabs, a compact top address bar, D-pad navigation, mouse mode and right-stick scrolling to devices such as the Retroid Pocket 6. It uses the installed Android System WebView.
 
-**Version 1.2.1 · Android 8.0+ · No root or Shizuku required**
+**Version 1.2.2 · Android 8.0+ · No root or Shizuku required**
 
-[Download APK](https://github.com/silasdv/PocketSurf/releases/download/v1.2.1/PocketSurf-1.2.1.apk) · [Release notes](docs/RELEASE-1.2.1.md) · [Changelog](CHANGELOG.md)
+[Download APK](https://github.com/silasdv/PocketSurf/releases/download/v1.2.2/PocketSurf-1.2.2.apk) · [Release notes](docs/RELEASE-1.2.2.md) · [Changelog](CHANGELOG.md)
 
 ## Install or update
 
-1. Download **PocketSurf-1.2.1.apk** from the [official release](https://github.com/silasdv/PocketSurf/releases/tag/v1.2.1) and install it.
+1. Download **PocketSurf-1.2.2.apk** from the [official release](https://github.com/silasdv/PocketSurf/releases/tag/v1.2.2) and install it.
 2. Choose a search engine and optionally pin websites in the two-page setup. Google is the default. Setup can be skipped and reopened in About.
 3. Use touch or a controller. Open the top-right gear or press Start for Settings; remap actions under Controller and adjust the pointer under Mouse.
 4. Choose a theme and accent, optionally enable the bookmarks bar, and use About to open Android's default-browser chooser.
@@ -26,6 +26,7 @@ A launcher start opens a fresh tab while retaining existing tabs. Share and Relo
 - Full touch operation, D-pad/left-stick selection and right-stick page/panel scrolling.
 - Separate mouse navigation with native hover/click, edge scrolling, a speed slider and optional acceleration.
 - Remappable actions, Nintendo SNES colors or vector PlayStation symbols and compact context-aware hints.
+- Progressive title truncation and compact tabs with stable favicon/close insets; overflow uses a +N entry.
 - Adaptive tab strip, visual previews, a horizontal Open Tabs view beyond three cards, Recently Closed, Undo and Close All.
 - Inline address/search editing, suggestions, several search providers and custom search templates.
 - One bookmark collection, six pinned start-page slots, an optional scrolling bookmarks bar and searchable management.
