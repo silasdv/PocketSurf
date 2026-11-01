@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.2.3 — 1 November 2026
+
+- Distribute available width across all visible tabs in title, compact and overflow modes.
+- Remove abrupt fixed-minimum-width shrinkage and trailing unused space.
+- Allocate rounding remainders to individual tabs; keep favicon/close insets stable.
+
 ## 1.2.2 — 1 November 2026
 
 - Keep readable truncated titles for longer before switching to compact tabs.
