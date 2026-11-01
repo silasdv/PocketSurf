@@ -1,0 +1,16 @@
+package org.pocketsurf.browser
+
+import org.junit.Assert.*
+import org.junit.Test
+
+class AdBlockRulesTest {
+ @Test fun hostRulesHaveRealDomainBoundaries(){val r=AdBlockRules.parse("||ads.example^\n");assertTrue(r.blocks("https://cdn.ads.example/banner.js","https://news.test"));assertTrue(r.blocks("https://ads.example:8443/a","https://news.test"));assertFalse(r.blocks("https://notads.example/a","https://news.test"));assertFalse(r.blocks("https://ads.example.safe.test/a","https://news.test"));assertFalse(r.blocks("https://safe.test/?u=ads.example","https://news.test"))}
+ @Test fun exceptionsOverrideNetworkBlocks(){val r=AdBlockRules.parse("||ads.example^\n@@||ads.example/consent.js");assertTrue(r.blocks("https://ads.example/banner.js","https://news.test"));assertFalse(r.blocks("https://ads.example/consent.js","https://news.test"))}
+ @Test fun unsupportedOptionsAreSkippedRatherThanBroadened(){val r=AdBlockRules.parse("||ads.example^\u0024script,third-party\n||track.example^\u0024unknown-option");assertEquals(0,r.supportedRules);assertEquals(2,r.skippedRules);assertFalse(r.blocks("https://ads.example/x","https://news.test"))}
+ @Test fun domainScopesIncludeAndExcludeSubdomains(){val r=AdBlockRules.parse("||ads.example^\u0024domain=news.test|~safe.news.test");assertTrue(r.blocks("https://ads.example/x","https://www.news.test"));assertFalse(r.blocks("https://ads.example/x","https://safe.news.test"));assertFalse(r.blocks("https://ads.example/x","https://other.test"))}
+ @Test fun wildcardSeparatorAndAnchorsWork(){val r=AdBlockRules.parse("||ads.example/banner*^\n|https://track.test/pixel|");assertTrue(r.blocks("https://ads.example/banner-123?q=x","https://news.test"));assertTrue(r.blocks("https://track.test/pixel","https://news.test"));assertFalse(r.blocks("https://track.test/pixel/other","https://news.test"));assertFalse(r.blocks("https://ads.example/not-banner-123","https://news.test"))}
+ @Test fun matchCaseAndPlainLiterals(){val r=AdBlockRules.parse("/Advertising/banner\u0024match-case\ntracking-pixel.gif");assertTrue(r.blocks("https://x.test/Advertising/banner","https://news.test"));assertFalse(r.blocks("https://x.test/advertising/banner","https://news.test"));assertTrue(r.blocks("https://x.test/TRACKING-PIXEL.GIF","https://news.test"))}
+ @Test fun cosmeticsApplyExceptionsAndScopes(){val r=AdBlockRules.parse("##.ad-slot\nnews.test##.sponsor\nnews.test#@#.ad-slot\nnews.test,~safe.news.test##[data-ad]\nnews.test##+js(bad)");assertEquals(setOf(".sponsor","[data-ad]"),r.selectors("https://news.test").toSet());assertEquals(setOf(".sponsor"),r.selectors("https://safe.news.test").toSet());assertEquals(listOf(".ad-slot"),r.selectors("https://other.test"));assertTrue(r.skippedRules>=1)}
+ @Test fun nonHttpAndMalformedResourcesAreNotBlocked(){val r=AdBlockRules.parse("||ads.example^");assertFalse(r.blocks("file://ads.example/a","https://news.test"));assertFalse(r.blocks("garbage","https://news.test"));assertFalse(r.blocks("https://ads.example/a","not-a-page"))}
+ @Test fun regexAndScriptletLanguagesAreNotExecuted(){val r=AdBlockRules.parse("/expensive.*regex/\nexample.test#%#anything\nexample.test##.ad{color:red}");assertEquals(0,r.supportedRules);assertEquals(3,r.skippedRules)}
+}

@@ -1,0 +1,13 @@
+.gradle/
+.kotlin/
+.local/
+.idea/
+local.properties
+**/build/
+*.iml
+*.jks
+*.keystore
+*.p12
+*.pfx
+*-signing.properties
+.DS_Store
