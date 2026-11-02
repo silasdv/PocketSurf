@@ -6,15 +6,15 @@
 
 PocketSurf by **SilasDV** brings desktop-style tabs, a compact top address bar, D-pad navigation, mouse mode and right-stick scrolling to devices such as the Retroid Pocket 6. It uses the installed Android System WebView.
 
-**Version 1.3.0 · Android 8.0+ · No root or Shizuku required**
+**Version 1.3.1 · Android 8.0+ · No root or Shizuku required**
 
-[Download APK](https://github.com/silasdv/PocketSurf/releases/download/v1.3.0/PocketSurf-1.3.0.apk) · [Release notes](docs/RELEASE-1.3.0.md) · [Changelog](CHANGELOG.md)
+[Download APK](https://github.com/silasdv/PocketSurf/releases/download/v1.3.1/PocketSurf-1.3.1.apk) · [Release notes](docs/RELEASE-1.3.1.md) · [Changelog](CHANGELOG.md)
 
 ## Install or update
 
-1. Download **PocketSurf-1.3.0.apk** from the [official release](https://github.com/silasdv/PocketSurf/releases/tag/v1.3.0) and install it.
+1. Download **PocketSurf-1.3.1.apk** from the [official release](https://github.com/silasdv/PocketSurf/releases/tag/v1.3.1) and install it.
 2. Choose a search engine and optionally pin websites in the two-page setup. Google is the default. Setup can be skipped and reopened in About.
-3. Use touch or a controller. Open the top-right gear or press Start for Settings; open Controls for controller remapping and pointer options.
+3. Use touch or a controller. Open the top-right gear or press Start for Settings; choose Controller for remapping or Mouse for pointer options.
 4. Choose a theme and accent, optionally enable the bookmarks bar, and use Browsing to open Android's default-browser chooser.
 
 **Earlier local test APKs:** this public release uses a dedicated release key. Android cannot update a development-signed installation with it. Export bookmarks/settings through **Settings > Backup and restore** before uninstalling a test build; uninstalling clears its data. Restore the JSON after installing the release. Cookies, history and open tabs are not included in that backup. Future public releases must retain this signing identity.
@@ -29,7 +29,7 @@ A launcher start opens a fresh tab while retaining existing tabs. Share and Relo
 - Thin accent page-loading bar and hidden Android status bar for more webpage space.
 - Full touch operation, D-pad/left-stick selection and right-stick page/panel scrolling.
 - Permanent desktop browsing with a desktop user-agent, supported desktop client hints and a wide viewport; no mobile-mode toggle.
-- Separate mouse navigation with native hover/click, analog stick speed, edge scrolling, a speed slider and optional acceleration. Pointer Size sits below movement speed with an always-visible preview. Mouse Appearance offers five original shapes (including a pixel metalhand) and independent fill/outline choices in a compact pop-up.
+- Separate mouse navigation with native hover/click, analog stick speed, edge scrolling, a speed slider and optional acceleration. Pointer Size sits below movement speed with an always-visible preview. Mouse settings show five original shape previews (including a pixel metalhand), independent fill/outline choices and a movement test directly in the dashboard.
 - Basic Android Custom Tabs provider for compatible app links, with a separate browser window and shared downloads.
 - Remappable actions, Nintendo SNES colors or vector PlayStation symbols and compact context-aware hints.
 - Progressive title truncation and responsive compact tabs with stable favicon/close insets; overflow uses a +N entry.
@@ -41,7 +41,7 @@ A launcher start opens a fresh tab while retaining existing tabs. Share and Relo
 - Limited URL-filter adblocking, optional EasyList updates, per-site controls and necessary-only cookie choices on recognized banners.
 - Private sessions on Android 9+ with a separate WebView profile, and explicit website camera/microphone requests.
 - Light, Dark, Auto and OLED, seven independent accents, text/touch settings and local JSON backup/restore.
-- Six categorized Settings sections with compact choice grids, consistent focus tiles and selected-choice checkmarks.
+- A single Settings dashboard with a fixed category rail, inline controls and confirmations, consistent focus styling and selected-choice checkmarks. No settings popups, nested pages or vertical scrolling at the validated handheld sizes.
 - Original flat P/S icon with adaptive and Android 13 monochrome launcher layers.
 
 ## Default controls
@@ -49,10 +49,10 @@ A launcher start opens a fresh tab while retaining existing tabs. Share and Relo
 | Input | Action |
 | --- | --- |
 | D-pad / left stick | Select page elements and interface controls |
-| Right stick | Scroll the page or active scrollable panel |
+| Right stick | Scroll; adjust the slider while Page Zoom is open |
 | A / Cross | Activate; hold on a page target for context options |
 | B / Circle | Page back; close a new-tab page; close the current menu/keyboard first; exit with zero tabs |
-| Android Back | Page back; return through menus/native screens; close keyboard first |
+| Android Back | Page back; close a new-tab page; return through menus/native screens; close keyboard first |
 | X / Square | Close current tab; close selected card in Open Tabs |
 | Y / Triangle | Enter/leave Surf Bar; initially select New Tab |
 | L / R | Page back/forward |

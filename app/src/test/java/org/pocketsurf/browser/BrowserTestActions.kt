@@ -13,6 +13,12 @@ internal object BrowserTestActions {
  private fun click(a:BrowserActivity,label:String){views(a.window.decorView).first{it.isShown&&it.contentDescription==label&&it.hasOnClickListeners()}.performClick();settle(a)}
  /** Navigate the actual category UI when an older feature fixture requests a moved setting. */
  fun settingsClick(a:BrowserActivity,label:String):Boolean{
+  if(field(a,"screen")=="settings"){
+   val category=when(label){"Appearance","Theme and accent","Reading and accessibility","Website text size"->"appearance";"Controller","Action buttons","Directional buttons"->"controller";"Mouse","Mouse Appearance"->"mouse";"Search engine","Start page","Bookmarks bar","Default browser"->"browsing";"Adblock","Cookie consent","Privacy and browsing data","Browsing data"->"privacy";"Backup and restore","About PocketSurf","Help and controls"->"about";else->null}
+   if(category!=null){views(a.window.decorView).first{it.contentDescription=="Category: $category"}.performClick();settle(a);if(label=="Default browser")click(a,label);return true}
+   val target=when{label=="SNES labels"->"Labels: PlayStation";label=="PlayStation labels"->"Labels: SNES";label in BrowserTheme.names->"Theme: $label";label.endsWith(" theme")->"Theme: ${label.removeSuffix(" theme")}";label.endsWith(" accent")->"Accent: ${label.removeSuffix(" accent")}";label=="Swap buttons"->"Confirm setting action";label=="Choose from list"->"Choose physical button";else->null}
+   if(target!=null){click(a,target);return true}
+  }
   val aliases=mapOf("Appearance" to "Theme and accent","Reading and accessibility" to "Website text size","Privacy and browsing data" to "Browsing data")
   val category=when(label){"Appearance","Theme and accent","Reading and accessibility","Website text size","Touch comfort","Touch comfort: on","Touch comfort: off"->"Appearance & accessibility";"Search engine","Start page","Bookmarks bar","Default browser"->"Browsing";"Controller","Mouse"->"Controls";"Adblock","Cookie consent","Privacy and browsing data","Browsing data"->"Privacy & protection";"Backup and restore","Export backup","Import backup"->"Backup & restore";"Help and controls","About PocketSurf"->"About & help";else->null}
   val target=aliases[label]?:if(label.startsWith("Touch comfort:"))"Touch comfort"else label

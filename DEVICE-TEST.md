@@ -30,3 +30,10 @@ No comprehensive handheld acceptance is claimed by the automated validation. Rec
 - Menu closing and rapid mouse/element switches without a retained gray overlay.
 - Enlarged tab cards, visible URLs/current badges, edge outlines and dim unavailable footer actions.
 - Categorized Settings and choice grids in light/dark/OLED at handheld display/font sizes; mouse-control spacing and pixel hand.
+
+- 1.3.1: category rail navigation by D-pad/left stick and touch, B/Android/touch Back, returning focus after theme changes or recreation.
+- Inline custom search/start-page editing with the installed keyboard; switching categories must end editing cleanly.
+- Inline remapping recording, touch button selection, collision cancellation and destructive-action confirmation.
+- Mouse size preview versus actual cursor, shape/fill/outline independence, and L3 movement testing.
+- Right-stick zoom only inside Page Zoom, neutral/deadzone behavior and normal scrolling after closing it.
+- Equal bookmarks-bar gaps and unclipped touch-comfort targets; Android Back closes New Tab with layers handled first.
