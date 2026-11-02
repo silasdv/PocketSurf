@@ -9,6 +9,8 @@ class SurfIcon(private val name:String,private val tint:Int):Drawable(){
  override fun draw(c:Canvas){val save=c.save();c.translate(bounds.left.toFloat(),bounds.top.toFloat());c.scale(bounds.width()/24f,bounds.height()/24f)
   fun line(vararg points:Float){val path=Path();path.moveTo(points[0],points[1]);for(i in 2 until points.size step 2)path.lineTo(points[i],points[i+1]);c.drawPath(path,p)}
   when(name){
+   "stop"->{p.style=Paint.Style.FILL;c.drawRoundRect(7f,7f,17f,17f,1f,1f,p);p.style=Paint.Style.STROKE}
+   "download-error"->{line(12f,3f,12f,14f);c.drawCircle(12f,19f,.7f,p)}
    "back"->line(14f,5f,7f,12f,14f,19f)
    "send"->{line(3f,4f,22f,12f,3f,20f,6f,12f,3f,4f);line(6f,12f,22f,12f)}
    "forward"->line(10f,5f,17f,12f,10f,19f)

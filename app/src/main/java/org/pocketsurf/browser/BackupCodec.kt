@@ -7,7 +7,7 @@ import org.json.JSONObject
 /** Explicit allowlist: no history, tabs, cookies, website storage or passwords. */
 object BackupCodec {
  const val MAX_BYTES=2*1024*1024
- private val keys=setOf("bookmarks","home_shortcuts","theme","accent","favorites_bar","home_mode","home_url","search","search_template","search_name","ps_labels","comfort_touch","default_text_zoom","reader_size","site_text_zoom","pointer_size","pointer_style","mouse_speed","mouse_acceleration","controls_layout_version")
+ private val keys=setOf("bookmarks","home_shortcuts","theme","accent","favorites_bar","home_mode","home_url","search","search_template","search_name","ps_labels","comfort_touch","default_text_zoom","reader_size","site_text_zoom","pointer_size","pointer_style","pointer_fill","pointer_outline","mouse_speed","mouse_acceleration","controls_layout_version")
  fun allowed(k:String)=k in keys||Control.entries.any{k=="key_${it.name}"}
  fun export(p:SharedPreferences):String {ControllerBindings(p);val values=JSONObject().put("controls_layout_version",2);p.all.filterKeys{allowed(it)}.forEach{(k,v)->values.put(k,v)};Control.entries.forEach{values.put("key_${it.name}",p.getInt("key_${it.name}",it.defaultKey))};return JSONObject().put("format","PocketSurf backup").put("version",1).put("values",values).toString(2).also{require(it.toByteArray(Charsets.UTF_8).size<=MAX_BYTES){"Backup exceeds 2 MB"}}}
  fun validate(raw:String):JSONObject {
@@ -17,8 +17,10 @@ object BackupCodec {
   if(clean.has("home_url")&&clean.getString("home_url").isNotBlank())StartPageStore.requireUrl(clean.getString("home_url"))
   if(clean.has("search_template"))require(SearchEngines.validateTemplate(clean.getString("search_template"))){"Invalid search engine"}
   if(clean.has("controls_layout_version"))require(clean.getInt("controls_layout_version") in 1..2)
+  if(clean.has("pointer_fill"))require(clean.getString("pointer_fill") in setOf("white","black","accent"))
+  if(clean.has("pointer_outline"))require(clean.getString("pointer_outline") in setOf("white","black","none"))
   if(clean.has("pointer_size"))require(clean.getInt("pointer_size") in 50..220)
-  if(clean.has("pointer_style"))require(clean.getString("pointer_style") in MousePointer.styles.keys)
+  if(clean.has("pointer_style"))require(clean.getString("pointer_style") in (MousePointer.styles.keys+MousePointer.legacy))
   if(clean.has("mouse_speed"))require(clean.getInt("mouse_speed") in 300..1800)
   if(clean.has("reader_size"))require(clean.getInt("reader_size") in 14..32){"Invalid reader size"}
   if(clean.has("default_text_zoom"))require(clean.getInt("default_text_zoom") in 75..200){"Invalid text size"}

@@ -6,13 +6,13 @@
 
 PocketSurf by **SilasDV** brings desktop-style tabs, a compact top address bar, D-pad navigation, mouse mode and right-stick scrolling to devices such as the Retroid Pocket 6. It uses the installed Android System WebView.
 
-**Version 1.2.8 · Android 8.0+ · No root or Shizuku required**
+**Version 1.2.9 · Android 8.0+ · No root or Shizuku required**
 
-[Download APK](https://github.com/silasdv/PocketSurf/releases/download/v1.2.8/PocketSurf-1.2.8.apk) · [Release notes](docs/RELEASE-1.2.8.md) · [Changelog](CHANGELOG.md)
+[Download APK](https://github.com/silasdv/PocketSurf/releases/download/v1.2.9/PocketSurf-1.2.9.apk) · [Release notes](docs/RELEASE-1.2.9.md) · [Changelog](CHANGELOG.md)
 
 ## Install or update
 
-1. Download **PocketSurf-1.2.8.apk** from the [official release](https://github.com/silasdv/PocketSurf/releases/tag/v1.2.8) and install it.
+1. Download **PocketSurf-1.2.9.apk** from the [official release](https://github.com/silasdv/PocketSurf/releases/tag/v1.2.9) and install it.
 2. Choose a search engine and optionally pin websites in the two-page setup. Google is the default. Setup can be skipped and reopened in About.
 3. Use touch or a controller. Open the top-right gear or press Start for Settings; remap actions under Controller and adjust the pointer under Mouse.
 4. Choose a theme and accent, optionally enable the bookmarks bar, and use About to open Android's default-browser chooser.
@@ -23,10 +23,13 @@ A launcher start opens a fresh tab while retaining existing tabs. Share and Relo
 
 ## Features
 
-- Surf Bar: nine grouped actions beside the address field; Y selects New Tab and the D-pad reaches the other actions. Leaving it restores the previous page target. The percentage between Downloads and New Tab opens page zoom; Y still starts on New Tab.
+- Surf Bar: nine grouped actions beside the address field; Y selects New Tab and the D-pad/left stick reaches the other actions. Up/down stays in the chrome; Y or Back leaves it. Leaving it restores the previous page target. The percentage between Downloads and New Tab opens page zoom; Y still starts on New Tab.
+- Compact layout-zoom slider with Reset to 100%, touch control and 5% controller steps. The CSS viewport reflows at the selected zoom.
+- Persistent animated download status with known-size progress and a completion marker.
+- Thin accent page-loading bar and hidden Android status bar for more webpage space.
 - Full touch operation, D-pad/left-stick selection and right-stick page/panel scrolling.
 - Permanent desktop browsing with a desktop user-agent, supported desktop client hints and a wide viewport; no mobile-mode toggle.
-- Separate mouse navigation with native hover/click, analog stick speed, edge scrolling, a speed slider and optional acceleration. Mouse Appearance adds a size slider and six cursor previews in a compact pop-up.
+- Separate mouse navigation with native hover/click, analog stick speed, edge scrolling, a speed slider and optional acceleration. Pointer Size sits below movement speed with an always-visible preview. Mouse Appearance offers five original shapes and independent fill/outline choices in a compact pop-up.
 - Basic Android Custom Tabs provider for compatible app links, with a separate browser window and shared downloads.
 - Remappable actions, Nintendo SNES colors or vector PlayStation symbols and compact context-aware hints.
 - Progressive title truncation and responsive compact tabs with stable favicon/close insets; overflow uses a +N entry.
@@ -84,7 +87,7 @@ Use JDK 17, Android SDK platform 35 / Build Tools 35.0.0 and the included Gradle
 
 ```sh
 ./gradlew testDebugUnitTest lintRelease assembleRelease bundleRelease
-node --test app/src/test/js/navigation.test.cjs app/src/test/js/cookie-consent.test.cjs tools/test-generated-download.mjs
+node --test app/src/test/js/navigation.test.cjs app/src/test/js/cookie-consent.test.cjs app/src/test/js/desktop.test.cjs tools/test-generated-download.mjs
 ```
 
 Windows uses `gradlew.bat`. Set `ANDROID_HOME` or `local.properties`. Release signing needs your own configuration; without it, a verification build can be unsigned. [Release signing](docs/RELEASING.md) · [Contributing](CONTRIBUTING.md). Never commit keys, passwords, caches or local SDK paths.

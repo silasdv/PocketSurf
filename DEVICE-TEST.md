@@ -18,3 +18,9 @@ No comprehensive handheld acceptance is claimed by the automated validation. Rec
 - Mouse Appearance pop-up, preview types, size extremes, pointer hotspot and backup/restore.
 - Permanent desktop layouts, redirects and client hints across fresh/restored/private/Custom Tab pages; page zoom via touch/controller and pinch.
 - Left Menu animation at fixed opacity and touch Back from bookmark search.
+
+- Surf Bar left-stick routing in mouse mode, up/down containment and Y/Back return target.
+- Auto-focused webpage inputs versus deliberately opened keyboards; fast keyboard dismissal and tab/menu transitions.
+- Layout zoom and responsive reflow on real websites, Reset to 100%, viewport mutations and rotation.
+- Known/unknown-size concurrent downloads, paused/error/cancelled states, completion markers and status animation.
+- Mid-animation tab-switch frames, active-only close glyph and compact/overflow transitions.

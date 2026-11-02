@@ -21,4 +21,4 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - run: node --test app/src/test/js/navigation.test.cjs app/src/test/js/cookie-consent.test.cjs tools/test-generated-download.mjs
+      - run: node --test app/src/test/js/navigation.test.cjs app/src/test/js/cookie-consent.test.cjs app/src/test/js/desktop.test.cjs tools/test-generated-download.mjs

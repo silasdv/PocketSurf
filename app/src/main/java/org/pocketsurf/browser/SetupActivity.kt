@@ -52,7 +52,7 @@ class SetupActivity:Activity() {
   accessibilityDelegate=object:View.AccessibilityDelegate(){override fun onInitializeAccessibilityNodeInfo(host:View,info:AccessibilityNodeInfo){super.onInitializeAccessibilityNodeInfo(host,info);info.className=if(radio)"android.widget.RadioButton"else"android.widget.CheckBox";info.isCheckable=true;info.isChecked=checked}}
   setOnClickListener{action()}
  }
- override fun onCreate(state:Bundle?){theme.applyPlatform(this);super.onCreate(state);step=(state?.getInt("step")?:0).coerceIn(0,1);engine=state?.getString("engine")?:SearchEngines.resolve(prefs).id;bookmarksBar=state?.getBoolean("favoritesBar")?:prefs.getBoolean(BOOKMARKS_BAR,false)
+ override fun onCreate(state:Bundle?){theme.applyPlatform(this);super.onCreate(state);window.addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);step=(state?.getInt("step")?:0).coerceIn(0,1);engine=state?.getString("engine")?:SearchEngines.resolve(prefs).id;bookmarksBar=state?.getBoolean("favoritesBar")?:prefs.getBoolean(BOOKMARKS_BAR,false)
   selected.addAll(state?.getStringArrayList("selected")?:ArrayList(store.shortcuts().map{it.url}));render()
   if(Build.VERSION.SDK_INT>=33)onBackInvokedDispatcher.registerOnBackInvokedCallback(android.window.OnBackInvokedDispatcher.PRIORITY_DEFAULT){backStep()}
  }

@@ -9,7 +9,8 @@ object DesktopBrowsing {
   val version=Regex("Chrome/[0-9.]+").find(original)?.value?:"Chrome/131.0.0.0"
   return "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) $version Safari/537.36"
  }
- val viewportScript="""(()=>{if(window.top!==window||window.__pocketDesktop)return;window.__pocketDesktop=true;const value='width=1280';const apply=()=>{if(!document.head)return;let m=document.querySelector('meta[name="viewport"]');if(!m){m=document.createElement('meta');m.name='viewport';document.head.appendChild(m);}if(m.content!==value)m.content=value;};new MutationObserver(apply).observe(document,{childList:true,subtree:true,attributes:true,attributeFilter:['content']});apply();})();"""
+ val viewportScript="""(()=>{if(window.top!==window||window.__pocketDesktop)return;let width=1280,deviceWidth=0;const apply=()=>{if(!document.head)return;let m=document.querySelector('meta[name="viewport"]');if(!m){m=document.createElement('meta');m.name='viewport';document.head.appendChild(m);}const value='width='+width+(deviceWidth>0?', initial-scale='+(deviceWidth/width):'');if(m.content!==value)m.content=value;};window.__pocketDesktop={setZoom(percent,available){width=Math.round(1280*100/Math.max(50,Math.min(250,percent)));deviceWidth=Math.max(1,available);apply();},get width(){return width;}};new MutationObserver(apply).observe(document,{childList:true,subtree:true,attributes:true,attributeFilter:['content']});apply();})();"""
+
  fun apply(view:WebView){
   val s=view.settings;s.userAgentString=userAgent(WebSettings.getDefaultUserAgent(view.context));s.useWideViewPort=true;s.loadWithOverviewMode=true
   if(WebViewFeature.isFeatureSupported(WebViewFeature.USER_AGENT_METADATA))WebSettingsCompat.setUserAgentMetadata(s,UserAgentMetadata.Builder().setMobile(false).setPlatform("Linux").setPlatformVersion("").setModel("").setArchitecture("x86").setBitness(64).build())
