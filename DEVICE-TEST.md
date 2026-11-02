@@ -24,3 +24,9 @@ No comprehensive handheld acceptance is claimed by the automated validation. Rec
 - Layout zoom and responsive reflow on real websites, Reset to 100%, viewport mutations and rotation.
 - Known/unknown-size concurrent downloads, paused/error/cancelled states, completion markers and status animation.
 - Mid-animation tab-switch frames, active-only close glyph and compact/overflow transitions.
+
+- 1.3.0: native-screen return to the same Surf Bar action, then return to the original webpage element/pointer.
+- Global layout zoom across live/evicted/private/Custom Tabs pages, reloads and app reopening on the installed WebView.
+- Menu closing and rapid mouse/element switches without a retained gray overlay.
+- Enlarged tab cards, visible URLs/current badges, edge outlines and dim unavailable footer actions.
+- Categorized Settings and choice grids in light/dark/OLED at handheld display/font sizes; mouse-control spacing and pixel hand.
