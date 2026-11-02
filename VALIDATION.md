@@ -1,13 +1,13 @@
-# Validation — PocketSurf 1.2.5
+# Validation — PocketSurf 1.2.6
 
-Executed 1 November 2026, versionCode 26.
+Executed 2 November 2026, versionCode 27.
 
-- Android/JVM: **296 passed; 0 failures/errors/skipped**. Includes input/focus/tab/mouse/native UI/privacy/download/session cases.
-- JavaScript navigation, cookie and generated downloads: **54 passed; 0 failed**.
-- assembleRelease, bundleRelease and lintRelease completed. Lint: **0 errors; 16 warnings**.
+- Android/JVM: **305 passed; 0 failures/errors/skipped**. Includes input/focus/tab/mouse/native UI/privacy/download/session cases.
+- JavaScript navigation, cookie and generated downloads: **55 passed; 0 failed**.
+- assembleRelease, bundleRelease and lintRelease completed. Lint: **0 errors; 19 warnings**.
 - Release APK signature verified (APK v2); dedicated release identity, SHA-256 certificate **80e11dde6e842966afa7125e6f3e5cdf2380a46e36245ce79cca9f7e7ee96c1c**.
 - Release App Bundle verified with jarsigner. Self-signed Android app certificates do not imply a public CA identity.
-- APK metadata confirms applicationId org.pocketsurf.browser, versionName 1.2.5 and versionCode 26; release is not debuggable.
+- APK metadata confirms applicationId org.pocketsurf.browser, versionName 1.2.6 and versionCode 27; release is not debuggable.
 - Native launcher test renders the compiled adaptive resource, requires monochrome artwork and checks the P stem and transparent S counter.
 - Theme regressions cover 56 base/night/accent combinations, native Android screens, platform accent, Auto mode, forms and IME recovery.
 
@@ -28,3 +28,9 @@ Mouse-click regression checks native tap down/up source, tool and coordinates, p
 Mouse taps wait for the existing page-input prepareClick handshake, so the page keeps mouse mode; callbacks are discarded after tab/focus/navigation changes.
 
 1.2.5 regressions cover APK/generic MIME, Content-Disposition and RFC5987 filenames, archive/ROM suffixes, extensionless download endpoints, automatic popup rejection, separate native popup tabs, and return to the original page. No exact ROM-site URL was provided, so site-specific redirection chains remain unverified.
+
+1.2.6 adds eight native tests for Custom Tabs service discovery, real AndroidX Binder warmup/session calls, HTTP routing, invalid-scheme rejection, normal-session isolation, recreation and navigation callbacks. Optional prefetch, postMessage and origin validation return unsupported results. No physical-device Discord-provider selection is claimed.
+
+Analog pointer regressions verify the deadzone, monotonically increasing speed, unchanged maximum speed, direction and diagonal normalization. The existing constant right-stick scrolling tests remain unchanged. JavaScript verifies accent selection and rejects invalid CSS color values. Native selection highlights use the selected theme overlay.
+
+The 19 lint warnings include the intentionally exported Custom Tabs service and available dependency upgrades; no lint errors. Browser integration is basic and does not claim Trusted Web Activity/authentication support. Signed 1.2.6 artifacts were prepared locally; GitHub release publication was unavailable in this session.

@@ -2,6 +2,7 @@
 
 PocketSurf's original code and vector icon are MIT-licensed; see LICENSE.
 
+- AndroidX Browser: Apache License 2.0 — https://developer.android.com/jetpack/androidx/releases/browser
 - AndroidX WebKit: Apache License 2.0 — https://developer.android.com/jetpack/androidx/releases/webkit
 - Kotlin standard library/tooling: Apache License 2.0 — https://kotlinlang.org/
 - Android Gradle Plugin and Gradle tooling: Apache License 2.0 — https://developer.android.com/build and https://gradle.org/

@@ -14,5 +14,12 @@ object BrowserLogic {
  fun velocity(x:Float,y:Float,deadzone:Float,speed:Float):Pair<Float,Float> {
   val m=sqrt(x*x+y*y);return if(m<=deadzone) 0f to 0f else x/m*speed to y/m*speed
  }
+ /** Radial deadzone with continuous analog speed; full deflection retains the speed ceiling. */
+ fun pointerVelocity(x:Float,y:Float,deadzone:Float,speed:Float):Pair<Float,Float> {
+  val magnitude=hypot(x,y)
+  if(magnitude<=deadzone)return 0f to 0f
+  val intensity=((magnitude.coerceAtMost(1f)-deadzone)/(1f-deadzone)).coerceIn(0f,1f)
+  return x/magnitude*speed*intensity to y/magnitude*speed*intensity
+ }
  fun adjacent(index:Int,delta:Int,size:Int)=if(size<=0) 0 else (index+delta).coerceIn(0,size-1)
 }

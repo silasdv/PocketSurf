@@ -6,7 +6,7 @@
   let scrollChain = null, scrollChainTime = 0;
   const ring = document.createElement('div');
   ring.setAttribute('aria-hidden', 'true');
-  ring.style.cssText = 'position:fixed;pointer-events:none;z-index:2147483647;border:3px solid #359cff;box-shadow:0 0 0 2px #071322,0 0 0 5px #ffffffb8;border-radius:5px;box-sizing:border-box;display:none;';
+  ring.style.cssText = 'position:fixed;pointer-events:none;z-index:2147483647;border:3px solid var(--pocketsurf-accent, #359cff);box-shadow:0 0 0 2px #071322,0 0 0 5px #ffffffb8;border-radius:5px;box-sizing:border-box;display:none;';
   (document.body || document.documentElement).appendChild(ring);
   const selector = 'a[href],button,input:not([type="hidden"]),textarea,select,summary,[tabindex],[role="button"],[role="link"],[role="checkbox"],[contenteditable="true"]';
   function isEditable(e) {
@@ -166,6 +166,7 @@
   }
   window.__pocketSurf={move,
     targetAt(p){const saved=pointer;pointer=p&&p[2]>0?[p[0]*innerWidth/p[2],p[1]*innerWidth/p[2]]:null;try{return target();}finally{pointer=saved;}},
+    accent(value){if(!/^#[0-9a-f]{6}$/i.test(value))return false;ring.style.borderColor=value;return true;},
     suspendSelection(){selectionVisible=false;editingTarget=null;pointer=null;setScroll(0,0);const e=deepActive();if(e&&typeof e.blur==='function')e.blur();updateRing();},
     resumeSelection(){selectionVisible=true;updateRing();},activationPoint,target,scroll,setScroll,canNativeScroll,editing,
     clearSelection(){const previous=current;current=null;pointer=null;editingTarget=null;setScroll(0,0);if(previous&&deepActive()===previous&&!isEditable(previous))try{previous.blur();}catch(_){};updateRing();},

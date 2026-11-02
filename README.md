@@ -6,7 +6,9 @@
 
 PocketSurf by **SilasDV** brings desktop-style tabs, a compact top address bar, D-pad navigation, mouse mode and right-stick scrolling to devices such as the Retroid Pocket 6. It uses the installed Android System WebView.
 
-**Version 1.2.5 · Android 8.0+ · No root or Shizuku required**
+**Latest public release 1.2.5 · Android 8.0+ · No root or Shizuku required**
+
+Development source: **1.2.6** — [upcoming release notes](docs/RELEASE-1.2.6.md).
 
 [Download APK](https://github.com/silasdv/PocketSurf/releases/download/v1.2.5/PocketSurf-1.2.5.apk) · [Release notes](docs/RELEASE-1.2.5.md) · [Changelog](CHANGELOG.md)
 
@@ -24,7 +26,8 @@ A launcher start opens a fresh tab while retaining existing tabs. Share and Relo
 ## Features
 
 - Full touch operation, D-pad/left-stick selection and right-stick page/panel scrolling.
-- Separate mouse navigation with native hover/click, edge scrolling, a speed slider and optional acceleration.
+- Separate mouse navigation with native hover/click, analog stick speed, edge scrolling, a speed slider and optional acceleration.
+- Basic Android Custom Tabs provider for compatible app links, with a separate browser window and shared downloads.
 - Remappable actions, Nintendo SNES colors or vector PlayStation symbols and compact context-aware hints.
 - Progressive title truncation and responsive compact tabs with stable favicon/close insets; overflow uses a +N entry.
 - Adaptive tab strip, visual previews, a horizontal Open Tabs view beyond three cards, Recently Closed, Undo and Close All.
