@@ -3,10 +3,11 @@ package org.pocketsurf.browser
 import android.content.SharedPreferences
 import android.view.KeyEvent
 
+/** Stored action IDs remain stable so existing custom physical bindings survive the Surf Bar update. */
 enum class Control(val title:String,val defaultKey:Int){
- CONFIRM("Confirm / open",96),BACK("Back / cancel",97),TABS("Tab overview",99),CONTEXT("New tab",100),
+ CONFIRM("Confirm / open",96),BACK("Back / cancel",97),TABS("Close tab",99),CONTEXT("Surf Bar",100),
  HISTORY_BACK("Page back",102),HISTORY_FORWARD("Page forward",103),PREVIOUS_TAB("Previous tab",104),NEXT_TAB("Next tab",105),
- POINTER("Mouse / element navigation",106),ZOOM("Reading zoom",107),SEARCH("Focus address / search",109),MENU("Settings",108),
+ POINTER("Mouse / element navigation",106),ZOOM("Reading zoom",107),SEARCH("Menu",109),MENU("Settings",108),
  UP("Move up",19),DOWN("Move down",20),LEFT("Move left",21),RIGHT("Move right",22)
 }
 class ControllerBindings(private val prefs:SharedPreferences){

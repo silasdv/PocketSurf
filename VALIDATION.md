@@ -1,13 +1,13 @@
-# Validation — PocketSurf 1.2.6
+# Validation — PocketSurf 1.2.7
 
-Executed 2 November 2026, versionCode 27.
+Executed 2 November 2026, versionCode 28.
 
-- Android/JVM: **309 passed; 0 failures/errors/skipped**. Includes input/focus/tab/mouse/native UI/privacy/download/session cases.
-- JavaScript navigation, cookie and generated downloads: **55 passed; 0 failed**.
-- assembleRelease, bundleRelease and lintRelease completed. Lint: **0 errors; 19 warnings**.
+- Android/JVM: **320 passed; 0 failures/errors/skipped**. Includes input/focus/tab/mouse/native UI/privacy/download/session cases.
+- JavaScript navigation, cookie and generated downloads: **59 passed; 0 failed**.
+- assembleRelease, bundleRelease and lintRelease completed. Lint: **0 errors; 20 warnings**.
 - Release APK signature verified (APK v2); dedicated release identity, SHA-256 certificate **80e11dde6e842966afa7125e6f3e5cdf2380a46e36245ce79cca9f7e7ee96c1c**.
 - Release App Bundle verified with jarsigner. Self-signed Android app certificates do not imply a public CA identity.
-- APK metadata confirms applicationId org.pocketsurf.browser, versionName 1.2.6 and versionCode 27; release is not debuggable.
+- APK metadata confirms applicationId org.pocketsurf.browser, versionName 1.2.7 and versionCode 28; release is not debuggable.
 - Native launcher test renders the compiled adaptive resource, requires monochrome artwork and checks the P stem and transparent S counter.
 - Theme regressions cover 56 base/night/accent combinations, native Android screens, platform accent, Auto mode, forms and IME recovery.
 
@@ -36,3 +36,5 @@ Analog pointer regressions verify the deadzone, monotonically increasing speed, 
 The 19 lint warnings include the intentionally exported Custom Tabs service and available dependency upgrades; no lint errors. Browser integration is basic and does not claim Trusted Web Activity/authentication support. Signed 1.2.6 artifacts were prepared locally and checked against the retained release identity.
 
 Four additional native UI regressions cover address-hint visibility while focused/editing, controller submission, balanced mouse-switch insets and fully visible About layouts at 960×540 and 640×360. Native mock-WebView renderings were inspected; they are not physical-device screenshots.
+
+1.2.7 adds eleven native regressions for ordered Surf Bar navigation, Y entry, address-boundary navigation, prior selection restoration, stale-return invalidation, native-screen return, B/Android Back versus X closing, pointer centering/handoff, active-only tab close targets, tab-width budgets and narrow-screen action/legend visibility. Four JavaScript regressions cover pointer-target adoption and explicit selection focus restoration. Earlier fixtures were updated to the new control contract. Native renderings were inspected at 960×540 and 412×800; mock WebView renderings do not prove real website behavior.

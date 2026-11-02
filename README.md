@@ -6,13 +6,13 @@
 
 PocketSurf by **SilasDV** brings desktop-style tabs, a compact top address bar, D-pad navigation, mouse mode and right-stick scrolling to devices such as the Retroid Pocket 6. It uses the installed Android System WebView.
 
-**Version 1.2.6 · Android 8.0+ · No root or Shizuku required**
+**Version 1.2.7 · Android 8.0+ · No root or Shizuku required**
 
-[Download APK](https://github.com/silasdv/PocketSurf/releases/download/v1.2.6/PocketSurf-1.2.6.apk) · [Release notes](docs/RELEASE-1.2.6.md) · [Changelog](CHANGELOG.md)
+[Download APK](https://github.com/silasdv/PocketSurf/releases/download/v1.2.7/PocketSurf-1.2.7.apk) · [Release notes](docs/RELEASE-1.2.7.md) · [Changelog](CHANGELOG.md)
 
 ## Install or update
 
-1. Download **PocketSurf-1.2.6.apk** from the [official release](https://github.com/silasdv/PocketSurf/releases/tag/v1.2.6) and install it.
+1. Download **PocketSurf-1.2.7.apk** from the [official release](https://github.com/silasdv/PocketSurf/releases/tag/v1.2.7) and install it.
 2. Choose a search engine and optionally pin websites in the two-page setup. Google is the default. Setup can be skipped and reopened in About.
 3. Use touch or a controller. Open the top-right gear or press Start for Settings; remap actions under Controller and adjust the pointer under Mouse.
 4. Choose a theme and accent, optionally enable the bookmarks bar, and use About to open Android's default-browser chooser.
@@ -23,6 +23,7 @@ A launcher start opens a fresh tab while retaining existing tabs. Share and Relo
 
 ## Features
 
+- Surf Bar: eight grouped actions beside the address field; Y selects New Tab and the D-pad reaches the other actions. Leaving it restores the previous page target.
 - Full touch operation, D-pad/left-stick selection and right-stick page/panel scrolling.
 - Separate mouse navigation with native hover/click, analog stick speed, edge scrolling, a speed slider and optional acceleration.
 - Basic Android Custom Tabs provider for compatible app links, with a separate browser window and shared downloads.
@@ -45,18 +46,18 @@ A launcher start opens a fresh tab while retaining existing tabs. Share and Relo
 | D-pad / left stick | Select page elements and interface controls |
 | Right stick | Scroll the page or active scrollable panel |
 | A / Cross | Activate; hold on a page target for context options |
-| B / Circle | Close the current browsing tab; back/cancel in menus; close keyboard first; exit with zero tabs |
-| Android Back | Open/close the browser sidebar on a page; return through native screens |
-| X / Square | Open/close tab overview |
-| Y / Triangle | New tab |
-| L / R | Page back/forward; R closes the focused card in Open Tabs |
+| B / Circle | Page back; close the current menu/keyboard first; exit with zero tabs |
+| Android Back | Page back; return through menus/native screens; close keyboard first |
+| X / Square | Close current tab; close selected card in Open Tabs |
+| Y / Triangle | Enter/leave Surf Bar; initially select New Tab |
+| L / R | Page back/forward |
 | L2 / R2 | Previous/next tab; stop at the ends |
 | L3 | Switch mouse/element navigation; test the pointer in Mouse Settings |
 | R3 | Reading zoom |
 | Start | Settings |
-| Select | Focus address/search; A opens the keyboard; Select submits while editing |
+| Select | Menu |
 
-Hints follow the current mapping and context. The small touch × is not a separate controller focus target. Firmware can report different physical button codes; choose labels and remap accordingly.
+Hints follow the current mapping and context. The Surf Bar opens tab overview and other actions; the top tab strip and page-history arrows remain touch targets with controller shortcuts, not D-pad stops. Mouse entry centers the pointer; returning to element mode adopts the target underneath it. The small touch × is not a separate controller focus target. Firmware can report different physical button codes; choose labels and remap accordingly.
 
 ## Bookmarks and sessions
 

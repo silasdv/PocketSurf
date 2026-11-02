@@ -165,10 +165,20 @@
     if(animation===null){previousTime=typeof performance!=='undefined'?performance.now():null;animation=requestAnimationFrame(animationFrame);}
   }
   window.__pocketSurf={move,
+    selectAt(p){
+      pointer=null;editingTarget=null;selectionVisible=true;
+      if(!p||!(p[2]>0))return false;
+      let hit=hitAt(p[0]*innerWidth/p[2],p[1]*innerWidth/p[2]);
+      for(let node=hit;node;node=node.parentElement||(node.getRootNode&&node.getRootNode().host)){
+        const candidate=node.closest&&node.closest(selector);
+        if(candidate&&eligible(candidate)){select(candidate);return true;}
+      }
+      current=null;updateRing();return false;
+    },
     targetAt(p){const saved=pointer;pointer=p&&p[2]>0?[p[0]*innerWidth/p[2],p[1]*innerWidth/p[2]]:null;try{return target();}finally{pointer=saved;}},
     accent(value){if(!/^#[0-9a-f]{6}$/i.test(value))return false;ring.style.borderColor=value;return true;},
     suspendSelection(){selectionVisible=false;editingTarget=null;pointer=null;setScroll(0,0);const e=deepActive();if(e&&typeof e.blur==='function')e.blur();updateRing();},
-    resumeSelection(){selectionVisible=true;updateRing();},activationPoint,target,scroll,setScroll,canNativeScroll,editing,
+    resumeSelection(restoreFocus=false){selectionVisible=true;if(restoreFocus&&inputMode==='controller'&&current&&eligible(current)&&!isEditable(current))try{current.focus({preventScroll:true});}catch(_){};updateRing();},activationPoint,target,scroll,setScroll,canNativeScroll,editing,
     clearSelection(){const previous=current;current=null;pointer=null;editingTarget=null;setScroll(0,0);if(previous&&deepActive()===previous&&!isEditable(previous))try{previous.blur();}catch(_){};updateRing();},
     releaseEditing(){editingTarget=null;const e=deepActive();if(isEditable(e))try{e.blur();}catch(_){};updateRing();},
     mode(value){if(value==='mouse'&&inputMode!=='mouse'){if(window.getSelection)try{window.getSelection().removeAllRanges();}catch(_){};current=null;editingTarget=null;pointer=null;setScroll(0,0);const active=deepActive();if(active&&typeof active.blur==='function')active.blur();}if(value==='touch'||value==='controller'||value==='mouse')inputMode=value;if(value==='touch')controllerClickUntil=0;updateRing();return inputMode;},
