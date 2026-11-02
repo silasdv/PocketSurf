@@ -13,3 +13,8 @@ No comprehensive handheld acceptance is claimed by the automated validation. Rec
 - Inline/fullscreen video, audio, seeking, rotation/background and a streaming site; DRM separately.
 - Private-profile separation/cleanup, media permission grant/deny and stale callbacks.
 - TalkBack, font scaling, portrait/landscape, cutouts/system bars and sustained memory pressure.
+
+- Surf Bar first-press activation at device display/font scaling, icon focus and equal chrome heights.
+- Mouse Appearance pop-up, preview types, size extremes, pointer hotspot and backup/restore.
+- Permanent desktop layouts, redirects and client hints across fresh/restored/private/Custom Tab pages; page zoom via touch/controller and pinch.
+- Left Menu animation at fixed opacity and touch Back from bookmark search.

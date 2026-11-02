@@ -6,13 +6,13 @@
 
 PocketSurf by **SilasDV** brings desktop-style tabs, a compact top address bar, D-pad navigation, mouse mode and right-stick scrolling to devices such as the Retroid Pocket 6. It uses the installed Android System WebView.
 
-**Version 1.2.7 · Android 8.0+ · No root or Shizuku required**
+**Version 1.2.8 · Android 8.0+ · No root or Shizuku required**
 
-[Download APK](https://github.com/silasdv/PocketSurf/releases/download/v1.2.7/PocketSurf-1.2.7.apk) · [Release notes](docs/RELEASE-1.2.7.md) · [Changelog](CHANGELOG.md)
+[Download APK](https://github.com/silasdv/PocketSurf/releases/download/v1.2.8/PocketSurf-1.2.8.apk) · [Release notes](docs/RELEASE-1.2.8.md) · [Changelog](CHANGELOG.md)
 
 ## Install or update
 
-1. Download **PocketSurf-1.2.7.apk** from the [official release](https://github.com/silasdv/PocketSurf/releases/tag/v1.2.7) and install it.
+1. Download **PocketSurf-1.2.8.apk** from the [official release](https://github.com/silasdv/PocketSurf/releases/tag/v1.2.8) and install it.
 2. Choose a search engine and optionally pin websites in the two-page setup. Google is the default. Setup can be skipped and reopened in About.
 3. Use touch or a controller. Open the top-right gear or press Start for Settings; remap actions under Controller and adjust the pointer under Mouse.
 4. Choose a theme and accent, optionally enable the bookmarks bar, and use About to open Android's default-browser chooser.
@@ -23,9 +23,10 @@ A launcher start opens a fresh tab while retaining existing tabs. Share and Relo
 
 ## Features
 
-- Surf Bar: eight grouped actions beside the address field; Y selects New Tab and the D-pad reaches the other actions. Leaving it restores the previous page target.
+- Surf Bar: nine grouped actions beside the address field; Y selects New Tab and the D-pad reaches the other actions. Leaving it restores the previous page target. The percentage between Downloads and New Tab opens page zoom; Y still starts on New Tab.
 - Full touch operation, D-pad/left-stick selection and right-stick page/panel scrolling.
-- Separate mouse navigation with native hover/click, analog stick speed, edge scrolling, a speed slider and optional acceleration.
+- Permanent desktop browsing with a desktop user-agent, supported desktop client hints and a wide viewport; no mobile-mode toggle.
+- Separate mouse navigation with native hover/click, analog stick speed, edge scrolling, a speed slider and optional acceleration. Mouse Appearance adds a size slider and six cursor previews in a compact pop-up.
 - Basic Android Custom Tabs provider for compatible app links, with a separate browser window and shared downloads.
 - Remappable actions, Nintendo SNES colors or vector PlayStation symbols and compact context-aware hints.
 - Progressive title truncation and responsive compact tabs with stable favicon/close insets; overflow uses a +N entry.
@@ -53,7 +54,7 @@ A launcher start opens a fresh tab while retaining existing tabs. Share and Relo
 | L / R | Page back/forward |
 | L2 / R2 | Previous/next tab; stop at the ends |
 | L3 | Switch mouse/element navigation; test the pointer in Mouse Settings |
-| R3 | Reading zoom |
+| R3 | Page zoom choices; D-pad left/right adjusts the percentage |
 | Start | Settings |
 | Select | Menu |
 

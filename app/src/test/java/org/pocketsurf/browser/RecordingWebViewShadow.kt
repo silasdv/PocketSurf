@@ -11,6 +11,9 @@ import org.robolectric.shadows.ShadowWebView
 @Implements(WebView::class)
 class RecordingWebViewShadow:ShadowWebView(){
  @RealObject private lateinit var view:WebView
+ private var recordedScale=1f
+ @Implementation fun getScale():Float=recordedScale
+ @Implementation fun zoomBy(factor:Float){zoomFactors.add(factor);recordedScale*=factor}
  @Implementation override fun evaluateJavascript(script:String,callback:ValueCallback<String>?){scripts.add(script);super.evaluateJavascript(script,callback)}
  @Implementation override fun scrollBy(x:Int,y:Int){nativeScroll.add(x to y);view.scrollTo(view.scrollX+x,view.scrollY+y)}
  @Implementation fun findAllAsync(query:String){findQueries.add(query)}
@@ -20,6 +23,7 @@ class RecordingWebViewShadow:ShadowWebView(){
  companion object {
   val scripts=mutableListOf<String>()
   val nativeScroll=mutableListOf<Pair<Int,Int>>()
+  val zoomFactors=mutableListOf<Float>()
   val findQueries=mutableListOf<String>()
   val findDirections=mutableListOf<Boolean>()
   var clearFindCalls=0

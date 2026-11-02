@@ -1,0 +1,18 @@
+package org.pocketsurf.browser
+import android.webkit.WebSettings
+import android.webkit.WebView
+import androidx.webkit.*
+
+/** One browsing policy for normal, restored, private, popup and Custom Tab views. */
+object DesktopBrowsing {
+ fun userAgent(original:String):String {
+  val version=Regex("Chrome/[0-9.]+").find(original)?.value?:"Chrome/131.0.0.0"
+  return "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) $version Safari/537.36"
+ }
+ val viewportScript="""(()=>{if(window.top!==window||window.__pocketDesktop)return;window.__pocketDesktop=true;const value='width=1280';const apply=()=>{if(!document.head)return;let m=document.querySelector('meta[name="viewport"]');if(!m){m=document.createElement('meta');m.name='viewport';document.head.appendChild(m);}if(m.content!==value)m.content=value;};new MutationObserver(apply).observe(document,{childList:true,subtree:true,attributes:true,attributeFilter:['content']});apply();})();"""
+ fun apply(view:WebView){
+  val s=view.settings;s.userAgentString=userAgent(WebSettings.getDefaultUserAgent(view.context));s.useWideViewPort=true;s.loadWithOverviewMode=true
+  if(WebViewFeature.isFeatureSupported(WebViewFeature.USER_AGENT_METADATA))WebSettingsCompat.setUserAgentMetadata(s,UserAgentMetadata.Builder().setMobile(false).setPlatform("Linux").setPlatformVersion("").setModel("").setArchitecture("x86").setBitness(64).build())
+  if(WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT))WebViewCompat.addDocumentStartJavaScript(view,viewportScript,setOf("*"))
+ }
+}
