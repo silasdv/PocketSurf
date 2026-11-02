@@ -2,7 +2,7 @@
 
 Executed 2 November 2026, versionCode 27.
 
-- Android/JVM: **305 passed; 0 failures/errors/skipped**. Includes input/focus/tab/mouse/native UI/privacy/download/session cases.
+- Android/JVM: **309 passed; 0 failures/errors/skipped**. Includes input/focus/tab/mouse/native UI/privacy/download/session cases.
 - JavaScript navigation, cookie and generated downloads: **55 passed; 0 failed**.
 - assembleRelease, bundleRelease and lintRelease completed. Lint: **0 errors; 19 warnings**.
 - Release APK signature verified (APK v2); dedicated release identity, SHA-256 certificate **80e11dde6e842966afa7125e6f3e5cdf2380a46e36245ce79cca9f7e7ee96c1c**.
@@ -33,4 +33,6 @@ Mouse taps wait for the existing page-input prepareClick handshake, so the page 
 
 Analog pointer regressions verify the deadzone, monotonically increasing speed, unchanged maximum speed, direction and diagonal normalization. The existing constant right-stick scrolling tests remain unchanged. JavaScript verifies accent selection and rejects invalid CSS color values. Native selection highlights use the selected theme overlay.
 
-The 19 lint warnings include the intentionally exported Custom Tabs service and available dependency upgrades; no lint errors. Browser integration is basic and does not claim Trusted Web Activity/authentication support. Signed 1.2.6 artifacts were prepared locally; GitHub release publication was unavailable in this session.
+The 19 lint warnings include the intentionally exported Custom Tabs service and available dependency upgrades; no lint errors. Browser integration is basic and does not claim Trusted Web Activity/authentication support. Signed 1.2.6 artifacts were prepared locally and checked against the retained release identity.
+
+Four additional native UI regressions cover address-hint visibility while focused/editing, controller submission, balanced mouse-switch insets and fully visible About layouts at 960×540 and 640×360. Native mock-WebView renderings were inspected; they are not physical-device screenshots.

@@ -10,6 +10,7 @@ class SurfIcon(private val name:String,private val tint:Int):Drawable(){
   fun line(vararg points:Float){val path=Path();path.moveTo(points[0],points[1]);for(i in 2 until points.size step 2)path.lineTo(points[i],points[i+1]);c.drawPath(path,p)}
   when(name){
    "back"->line(14f,5f,7f,12f,14f,19f)
+   "send"->{line(3f,4f,22f,12f,3f,20f,6f,12f,3f,4f);line(6f,12f,22f,12f)}
    "forward"->line(10f,5f,17f,12f,10f,19f)
    "search"->{c.drawCircle(10.5f,10.5f,6.5f,p);line(15.5f,15.5f,21f,21f)}
    "zoom-out"->{c.drawCircle(10f,10f,6.5f,p);line(15f,15f,21f,21f);line(7f,10f,13f,10f)}

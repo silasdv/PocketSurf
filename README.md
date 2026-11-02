@@ -6,15 +6,13 @@
 
 PocketSurf by **SilasDV** brings desktop-style tabs, a compact top address bar, D-pad navigation, mouse mode and right-stick scrolling to devices such as the Retroid Pocket 6. It uses the installed Android System WebView.
 
-**Latest public release 1.2.5 · Android 8.0+ · No root or Shizuku required**
+**Version 1.2.6 · Android 8.0+ · No root or Shizuku required**
 
-Development source: **1.2.6** — [upcoming release notes](docs/RELEASE-1.2.6.md).
-
-[Download APK](https://github.com/silasdv/PocketSurf/releases/download/v1.2.5/PocketSurf-1.2.5.apk) · [Release notes](docs/RELEASE-1.2.5.md) · [Changelog](CHANGELOG.md)
+[Download APK](https://github.com/silasdv/PocketSurf/releases/download/v1.2.6/PocketSurf-1.2.6.apk) · [Release notes](docs/RELEASE-1.2.6.md) · [Changelog](CHANGELOG.md)
 
 ## Install or update
 
-1. Download **PocketSurf-1.2.5.apk** from the [official release](https://github.com/silasdv/PocketSurf/releases/tag/v1.2.5) and install it.
+1. Download **PocketSurf-1.2.6.apk** from the [official release](https://github.com/silasdv/PocketSurf/releases/tag/v1.2.6) and install it.
 2. Choose a search engine and optionally pin websites in the two-page setup. Google is the default. Setup can be skipped and reopened in About.
 3. Use touch or a controller. Open the top-right gear or press Start for Settings; remap actions under Controller and adjust the pointer under Mouse.
 4. Choose a theme and accent, optionally enable the bookmarks bar, and use About to open Android's default-browser chooser.
@@ -56,7 +54,7 @@ A launcher start opens a fresh tab while retaining existing tabs. Share and Relo
 | L3 | Switch mouse/element navigation; test the pointer in Mouse Settings |
 | R3 | Reading zoom |
 | Start | Settings |
-| Select | Focus address/search; A opens the keyboard |
+| Select | Focus address/search; A opens the keyboard; Select submits while editing |
 
 Hints follow the current mapping and context. The small touch × is not a separate controller focus target. Firmware can report different physical button codes; choose labels and remap accordingly.
 
