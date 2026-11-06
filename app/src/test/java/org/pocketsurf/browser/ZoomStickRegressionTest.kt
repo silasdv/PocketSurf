@@ -16,7 +16,7 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk=[33],shadows=[RecordingWebViewShadow::class])
 class ZoomStickRegressionTest {
- @Before fun reset(){RuntimeEnvironment.getApplication().getSharedPreferences("browser",0).edit().clear().putBoolean(SetupActivity.COMPLETE,true).commit()}
+ @Before fun reset(){RuntimeEnvironment.getApplication().getSharedPreferences("browser",0).edit().clear().putBoolean("setup_complete",true).commit()}
  private fun call(a:BrowserActivity,name:String,vararg args:Any)=BrowserActivity::class.java.declaredMethods.first{it.name==name&&it.parameterCount==args.size}.apply{isAccessible=true}.invoke(a,*args)
  private fun field(a:BrowserActivity,name:String)=BrowserActivity::class.java.getDeclaredField(name).apply{isAccessible=true}.get(a)
  @Test fun rightStickChangesVisibleSliderWithDeadzoneRepeatAndImmediateReversal(){

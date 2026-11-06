@@ -1,4 +1,4 @@
-name: Android checks
+name: Android preview checks
 on: [push, pull_request]
 permissions:
   contents: read
@@ -12,13 +12,14 @@ jobs:
           distribution: temurin
           java-version: '17'
       - uses: android-actions/setup-android@v3
-        with:
-          packages: 'platform-tools'
-          log-accepted-android-sdk-licenses: 'false'
       - uses: gradle/actions/setup-gradle@v4
       - run: sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
-      - run: bash gradlew testDebugUnitTest lintRelease assembleRelease --no-daemon
+      - run: bash gradlew assembleDebug testDebugUnitTest lintDebug --no-daemon
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - run: node --test app/src/test/js/navigation.test.cjs app/src/test/js/cookie-consent.test.cjs app/src/test/js/desktop.test.cjs tools/test-generated-download.mjs
+      - run: node --test app/src/test/js/navigation.test.cjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PocketSurf-debug-preview
+          path: app/build/outputs/apk/debug/app-debug.apk

@@ -6,7 +6,7 @@ import android.graphics.drawable.Drawable
 /** Small original vector icon set, consistent 24-unit grid and rounded strokes. */
 class SurfIcon(private val name:String,private val tint:Int):Drawable(){
  private val p=Paint(Paint.ANTI_ALIAS_FLAG).apply{color=tint;style=Paint.Style.STROKE;strokeWidth=1.8f;strokeCap=Paint.Cap.ROUND;strokeJoin=Paint.Join.ROUND}
- override fun draw(c:Canvas){val save=c.save();c.translate(bounds.left.toFloat(),bounds.top.toFloat());c.scale(bounds.width()/24f,bounds.height()/24f)
+ override fun draw(c:Canvas){val save=c.save();c.translate(bounds.left.toFloat(),bounds.top.toFloat());val scale=minOf(bounds.width(),bounds.height())/24f;c.translate((bounds.width()-24*scale)/2,(bounds.height()-24*scale)/2);c.scale(scale,scale)
   fun line(vararg points:Float){val path=Path();path.moveTo(points[0],points[1]);for(i in 2 until points.size step 2)path.lineTo(points[i],points[i+1]);c.drawPath(path,p)}
   when(name){
    "stop"->{p.style=Paint.Style.FILL;c.drawRoundRect(7f,7f,17f,17f,1f,1f,p);p.style=Paint.Style.STROKE}
@@ -14,6 +14,18 @@ class SurfIcon(private val name:String,private val tint:Int):Drawable(){
    "back"->line(14f,5f,7f,12f,14f,19f)
    "send"->{line(3f,4f,22f,12f,3f,20f,6f,12f,3f,4f);line(6f,12f,22f,12f)}
    "forward"->line(10f,5f,17f,12f,10f,19f)
+   "info"->{c.drawCircle(12f,12f,9f,p);line(12f,11f,12f,17f);c.drawPoint(12f,7.5f,p)}
+   "copy"->{c.drawRoundRect(7f,7f,21f,21f,2f,2f,p);line(4f,17f,3f,17f,3f,3f,17f,3f,17f,4f)}
+   "export"->{line(4f,14f,4f,21f,20f,21f,20f,14f);line(12f,16f,12f,3f,7f,8f);line(12f,3f,17f,8f)}
+   "snes-pad","playstation"->{
+    p.style=Paint.Style.FILL
+    c.drawPath(if(name=="snes-pad")LicensedIcons.nintendo else LicensedIcons.playStation,p)
+    p.style=Paint.Style.STROKE
+   }
+   "dpad-up","dpad-down","dpad-left","dpad-right"->{
+    c.rotate(when(name){"dpad-down"->180f;"dpad-left"->270f;"dpad-right"->90f;else->0f},12f,12f)
+    c.drawPath(LicensedIcons.arrow,p)
+   }
    "search"->{c.drawCircle(10.5f,10.5f,6.5f,p);line(15.5f,15.5f,21f,21f)}
    "zoom-out"->{c.drawCircle(10f,10f,6.5f,p);line(15f,15f,21f,21f);line(7f,10f,13f,10f)}
    "zoom-in"->{c.drawCircle(10f,10f,6.5f,p);line(15f,15f,21f,21f);line(7f,10f,13f,10f);line(10f,7f,10f,13f)}
@@ -36,7 +48,7 @@ class SurfIcon(private val name:String,private val tint:Int):Drawable(){
    "history"->{c.drawArc(4f,4f,21f,21f,210f,320f,false,p);line(3f,4f,3f,10f,9f,10f);line(12f,7f,12f,13f,16f,15f)}
    "download"->{line(12f,3f,12f,16f);line(7f,11f,12f,16f,17f,11f);line(4f,17f,4f,21f,20f,21f,20f,17f)}
    "bookmark"->line(6f,3f,18f,3f,18f,21f,12f,17f,6f,21f,6f,3f)
-   "settings"->{val gear=Path();for(i in 0 until 32){val a=(i*2*Math.PI/32)-Math.PI/2;val r=if(i%4==1||i%4==2)10f else 7.5f;val x=12f+r*kotlin.math.cos(a).toFloat();val y=12f+r*kotlin.math.sin(a).toFloat();if(i==0)gear.moveTo(x,y)else gear.lineTo(x,y)};gear.close();c.drawPath(gear,p);c.drawCircle(12f,12f,3f,p)}
+   "settings","logo"->{p.style=Paint.Style.FILL;c.drawPath(PocketSurfLogo.path,p);p.style=Paint.Style.STROKE}
    "home"->{line(3f,11f,12f,3f,21f,11f);line(5f,10f,5f,21f,10f,21f,10f,15f,14f,15f,14f,21f,19f,21f,19f,10f)}
    "shield"->{val path=Path().apply{moveTo(12f,2f);lineTo(21f,6f);lineTo(20f,13f);cubicTo(19f,18f,15f,21f,12f,22f);cubicTo(9f,21f,5f,18f,4f,13f);lineTo(3f,6f);close()};c.drawPath(path,p);line(8f,12f,11f,15f,16f,9f)}
    "cookie"->{val path=Path().apply{moveTo(13f,3f);cubicTo(7f,1f,2f,6f,2f,12f);cubicTo(2f,18f,7f,22f,13f,21f);cubicTo(18f,21f,22f,17f,22f,12f);cubicTo(18f,13f,17f,10f,18f,8f);cubicTo(14f,9f,11f,6f,13f,3f);close()};c.drawPath(path,p);for(point in listOf(7f to 9f,11f to 15f,6f to 16f,16f to 17f))c.drawCircle(point.first,point.second,.8f,p)}
@@ -57,5 +69,5 @@ class SurfIcon(private val name:String,private val tint:Int):Drawable(){
    else->{c.drawCircle(12f,12f,9f,p);line(12f,10f,12f,17f);c.drawCircle(12f,6.5f,.5f,p)}
   };c.restoreToCount(save)
  }
- override fun setAlpha(a:Int){p.alpha=a};override fun setColorFilter(f:ColorFilter?){p.colorFilter=f};@Deprecated("Deprecated in Java") override fun getOpacity()=PixelFormat.TRANSLUCENT
+ override fun setAlpha(a:Int){p.alpha=a;invalidateSelf()};override fun setColorFilter(f:ColorFilter?){p.colorFilter=f;invalidateSelf()};@Deprecated("Deprecated in Java") override fun getOpacity()=PixelFormat.TRANSLUCENT
 }

@@ -5,6 +5,23 @@ const fs = require('node:fs');
 const path = require('node:path');
 const source = fs.readFileSync(path.resolve(__dirname, '../../main/assets/navigation.js'), 'utf8');
 
+test('menu suspension fades over 120 ms and can restore focus immediately', () => {
+  const f = fixture();
+  f.element('link', 20, 20);
+  f.api.move('down');
+  f.api.suspendSelection(true);
+  assert.equal(f.state.ring.style.display, 'block');
+  f.step(60);
+  assert.equal(Number(f.state.ring.style.opacity), .5);
+  f.api.resumeSelection(true);
+  f.step(60);
+  assert.equal(f.state.ring.style.opacity, '1');
+  assert.equal(f.state.focused, 'link');
+  f.api.suspendSelection(true);
+  f.step(120);
+  assert.equal(f.state.ring.style.display, 'none');
+});
+
 // Controlled geometry and virtual animation clock execute the shipped source, not a second algorithm.
 function fixture() {
   const state = {elements:[], focused:null, pageScroll:0, scrollX:0, scrollY:0, now:0, ring:null, queries:0, styles:0, hits:0};

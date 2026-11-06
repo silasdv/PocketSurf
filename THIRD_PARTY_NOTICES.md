@@ -14,3 +14,5 @@ Android System WebView is supplied separately by the device/provider, with its o
 Starter adblock rules and the cookie helper are original application code. Optional runtime EasyList downloads are maintained under that project's own terms: https://github.com/easylist/easylist. Downloaded filters/caches are not bundled in source.
 
 Destination-link symbols and Nintendo/PlayStation controller labels imply no affiliation or endorsement.
+
+Controller and direction icons use Lucide, Material Design Icons and Simple Icons artwork. Their sources and license texts ship in app/src/main/assets/icon-licenses/. The pixel hand artwork was supplied by Silas. Search uses OkHttp and its bundled public suffix database.

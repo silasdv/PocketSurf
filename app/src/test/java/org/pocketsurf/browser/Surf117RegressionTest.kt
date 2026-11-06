@@ -24,7 +24,7 @@ import java.time.Duration
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class Surf117RegressionTest {
  private val prefs get()=RuntimeEnvironment.getApplication().getSharedPreferences("browser",0)
- @Before fun reset(){prefs.edit().clear().putBoolean(SetupActivity.COMPLETE,true).commit();RecordingWebViewShadow.clearEvidence()}
+ @Before fun reset(){prefs.edit().clear().putBoolean("setup_complete",true).commit();RecordingWebViewShadow.clearEvidence()}
  private fun all(v:View):List<View> = listOf(v)+if(v is ViewGroup)(0 until v.childCount).flatMap{all(v.getChildAt(it))}else emptyList()
  private fun views(a:BrowserActivity)=all(a.window.decorView)
  private fun field(a:Any,n:String):Any?=a.javaClass.getDeclaredField(n).apply{isAccessible=true}.get(a)

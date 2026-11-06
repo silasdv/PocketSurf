@@ -20,7 +20,7 @@ class CustomTabsProviderTest {
  private val app get()=RuntimeEnvironment.getApplication()
  private val prefs get()=app.getSharedPreferences("browser",0)
  private val url="https://files.test/attachment.apk"
- @Before fun reset(){prefs.edit().clear().putBoolean(SetupActivity.COMPLETE,true).commit()}
+ @Before fun reset(){prefs.edit().clear().putBoolean("setup_complete",true).commit()}
  private fun field(a:BrowserActivity,n:String)=BrowserActivity::class.java.getDeclaredField(n).apply{isAccessible=true}.get(a)
  private fun call(a:BrowserActivity,n:String)=BrowserActivity::class.java.declaredMethods.first{it.name==n&&it.parameterCount==0}.apply{isAccessible=true}.invoke(a)
  private fun intent()=CustomTabsIntent.Builder().build().intent.setData(Uri.parse(url))

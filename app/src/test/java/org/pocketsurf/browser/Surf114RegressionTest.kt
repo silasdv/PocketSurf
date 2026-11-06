@@ -24,7 +24,7 @@ import java.time.Duration
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class Surf114RegressionTest {
  private val prefs get()=RuntimeEnvironment.getApplication().getSharedPreferences("browser",0)
- @Before fun reset(){prefs.edit().clear().putBoolean(SetupActivity.COMPLETE,true).commit();RecordingWebViewShadow.clearEvidence()}
+ @Before fun reset(){prefs.edit().clear().putBoolean("setup_complete",true).commit();RecordingWebViewShadow.clearEvidence()}
  private fun all(v:View):List<View> = listOf(v)+if(v is ViewGroup)(0 until v.childCount).flatMap{all(v.getChildAt(it))}else emptyList()
  private fun views(a:BrowserActivity)=all(a.window.decorView)
  private fun field(a:Any,n:String):Any?=a.javaClass.getDeclaredField(n).apply{isAccessible=true}.get(a)
@@ -40,7 +40,7 @@ class Surf114RegressionTest {
  private fun count(a:BrowserActivity)=(field(a,"tabs") as List<*>).size
  private fun texts(v:View)=all(v).filterIsInstance<TextView>().map{it.text.toString()}
 
- @Test fun mouseSpeedSliderStartsSlowerAndControllerChangesPersist(){val c=start();val a=c.get();val u=DashboardChecks;u.open(a,"mouse");assertEquals(100,u.slider(a,"Movement speed").progress+50);u.node(a,"Movement speed").requestFocus();u.key(a,22);assertEquals(630,a.getSharedPreferences("browser",0).getInt("mouse_speed",0));u.fits(a);c.pause().stop().destroy()}
- @Test fun mousePreviewCanBeToggledByL3AndTouchWithoutLosingSliderNavigation(){val c=start();val a=c.get();val u=DashboardChecks;u.open(a,"mouse");u.key(a,106);assertTrue((u.field(a,"settingsDashboard") as SettingsDashboard).mouseTesting());u.click(a,"Test mouse navigation");assertFalse((u.field(a,"settingsDashboard") as SettingsDashboard).mouseTesting());u.node(a,"Movement speed").requestFocus();u.key(a,22);assertEquals(630,a.getSharedPreferences("browser",0).getInt("mouse_speed",0));c.pause().stop().destroy()}
+ @Test fun mouseSpeedSliderStartsSlowerAndControllerChangesPersist(){val c=start();val a=c.get();val u=DashboardChecks;u.open(a,"mouse");assertEquals(100,u.slider(a,"Movement speed").progress+50);u.node(a,"Movement speed").requestFocus();u.key(a,96);u.key(a,22);assertEquals(630,a.getSharedPreferences("browser",0).getInt("mouse_speed",0));u.fits(a);c.pause().stop().destroy()}
+ @Test fun mousePreviewCanBeToggledByL3AndTouchWithoutLosingSliderNavigation(){val c=start();val a=c.get();val u=DashboardChecks;u.open(a,"mouse");u.key(a,106);assertTrue((u.field(a,"settingsDashboard") as SettingsDashboard).mouseTesting());u.click(a,"Test mouse navigation");assertFalse((u.field(a,"settingsDashboard") as SettingsDashboard).mouseTesting());u.node(a,"Movement speed").requestFocus();u.key(a,96);u.key(a,22);assertEquals(630,a.getSharedPreferences("browser",0).getInt("mouse_speed",0));c.pause().stop().destroy()}
  @Test fun surfBarIconsRemainCenteredWithoutInlineLabels(){val c=start();val a=c.get();for(name in listOf("Settings","Menu","Open tabs","New tab")){val button=desc(a,name) as ViewGroup;val icon=button.getChildAt(0);assertEquals(button.width/2f,icon.left+icon.width/2f,1f);assertEquals(button.height/2f,icon.top+icon.height/2f,1f);assertTrue(all(button).none{it.tag==0x7f0f0108})};shot(a,"surf-bar-centered-icons");c.pause().stop().destroy()}
 }

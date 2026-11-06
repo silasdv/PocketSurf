@@ -1,6 +1,7 @@
 (() => {
   if (window.__pocketSurf) return;
   let selectionVisible = true;
+  let selectionFadeUntil = 0;
   let current = null, pointer = null, inputMode = 'controller', editingTarget = null, dirty = false;
   let velocityX = 0, velocityY = 0, animation = null, previousTime = null, controllerClickUntil = 0;
   let scrollChain = null, scrollChainTime = 0;
@@ -25,7 +26,9 @@
     return !!editingTarget || isEditable(deepActive());
   }
   function updateRing() {
-    if (!selectionVisible || inputMode !== 'controller' || !current || !current.isConnected) { ring.style.display = 'none'; return; }
+    const remaining = selectionFadeUntil - performance.now();
+    if ((!selectionVisible && remaining <= 0) || inputMode !== 'controller' || !current || !current.isConnected) { ring.style.display = 'none'; return; }
+    ring.style.opacity = selectionVisible ? '1' : String(Math.min(1, remaining / 120));
     const r = current.getBoundingClientRect();
     Object.assign(ring.style, { display:'block', left:`${r.left-3}px`, top:`${r.top-3}px`, width:`${r.width+6}px`, height:`${r.height+6}px` });
   }
@@ -50,13 +53,14 @@
     return null;
   }
   function eligible(e) {
-    if (!e || !e.isConnected || e.disabled || e.closest('[inert],[aria-hidden="true"]') || e.getAttribute('aria-disabled') === 'true') return false;
+    if (!e || !e.isConnected || e.disabled || e.closest('[inert]') || e.getAttribute('aria-disabled') === 'true') return false;
     const r = e.getBoundingClientRect(), s = getComputedStyle(e);
     if (r.width < 2 || r.height < 2 || s.display === 'none' || s.visibility !== 'visible' || Number(s.opacity) === 0) return false;
     if (r.bottom > 0 && r.top < innerHeight && r.right > 0 && r.left < innerWidth) {
       return [[r.x+r.width/2,r.y+r.height/2],[r.x+4,r.y+4],[r.right-4,r.bottom-4]].some(([x,y]) => {
-        const hit = hitAt(Math.max(1,Math.min(innerWidth-1,x)),Math.max(1,Math.min(innerHeight-1,y)));
-        return hit && (hit === e || e.contains(hit) || composedContains(e,hit));
+        const cx = Math.max(1,Math.min(innerWidth-1,x)), cy = Math.max(1,Math.min(innerHeight-1,y));
+        const stack = typeof document.elementsFromPoint === 'function' ? document.elementsFromPoint(cx, cy) : [hitAt(cx, cy)];
+        return stack.some(hit => hit && (hit === e || e.contains(hit) || composedContains(e, hit)));
       });
     }
     return true;
@@ -177,8 +181,18 @@
     },
     targetAt(p){const saved=pointer;pointer=p&&p[2]>0?[p[0]*innerWidth/p[2],p[1]*innerWidth/p[2]]:null;try{return target();}finally{pointer=saved;}},
     accent(value){if(!/^#[0-9a-f]{6}$/i.test(value))return false;ring.style.borderColor=value;return true;},
-    suspendSelection(){selectionVisible=false;editingTarget=null;pointer=null;setScroll(0,0);const e=deepActive();if(e&&typeof e.blur==='function')e.blur();updateRing();},
-    resumeSelection(restoreFocus=false){selectionVisible=true;if(restoreFocus&&inputMode==='controller'&&current&&eligible(current)&&!isEditable(current))try{current.focus({preventScroll:true});}catch(_){};updateRing();},activationPoint,target,scroll,setScroll,canNativeScroll,editing,
+    suspendSelection(fade=false){
+      selectionFadeUntil = fade && selectionVisible ? performance.now() + 120 : 0;
+      selectionVisible=false;editingTarget=null;pointer=null;setScroll(0,0);
+      const e=deepActive();if(e&&typeof e.blur==='function')e.blur();
+      updateRing();
+      if (fade) requestAnimationFrame(function fadeFrame() {
+        if (selectionVisible) return;
+        updateRing();
+        if (performance.now() < selectionFadeUntil) requestAnimationFrame(fadeFrame);
+      });
+    },
+    resumeSelection(restoreFocus=false){selectionFadeUntil=0;selectionVisible=true;if(restoreFocus&&inputMode==='controller'&&current&&eligible(current)&&!isEditable(current))try{current.focus({preventScroll:true});}catch(_){};updateRing();},activationPoint,target,scroll,setScroll,canNativeScroll,editing,
     clearSelection(){const previous=current;current=null;pointer=null;editingTarget=null;setScroll(0,0);if(previous&&deepActive()===previous&&!isEditable(previous))try{previous.blur();}catch(_){};updateRing();},
     releaseEditing(){editingTarget=null;const e=deepActive();if(isEditable(e))try{e.blur();}catch(_){};updateRing();},
     mode(value){if(value==='mouse'&&inputMode!=='mouse'){if(window.getSelection)try{window.getSelection().removeAllRanges();}catch(_){};current=null;editingTarget=null;pointer=null;setScroll(0,0);const active=deepActive();if(active&&typeof active.blur==='function')active.blur();}if(value==='touch'||value==='controller'||value==='mouse')inputMode=value;if(value==='touch')controllerClickUntil=0;updateRing();return inputMode;},

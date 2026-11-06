@@ -13,4 +13,42 @@
  <style name="SurfAccentCoralDark"><item name="android:colorAccent">#ffad91</item><item name="android:textColorHighlight">#66ffad91</item><item name="android:colorControlActivated">#ffad91</item></style>
  <style name="SurfAccentRedLight"><item name="android:colorAccent">#b02535</item><item name="android:textColorHighlight">#66b02535</item><item name="android:colorControlActivated">#b02535</item></style>
  <style name="SurfAccentRedDark"><item name="android:colorAccent">#ff96a0</item><item name="android:textColorHighlight">#66ff96a0</item><item name="android:colorControlActivated">#ff96a0</item></style>
+ <style name="SurfAccentCrimsonLight"><item name="android:colorAccent">#a41427</item><item name="android:textColorHighlight">#66a41427</item><item name="android:colorControlActivated">#a41427</item></style>
+ <style name="SurfAccentCrimsonDark"><item name="android:colorAccent">#ff5360</item><item name="android:textColorHighlight">#66ff5360</item><item name="android:colorControlActivated">#ff5360</item></style>
+ <style name="SurfAccentCobaltLight"><item name="android:colorAccent">#1845b7</item><item name="android:textColorHighlight">#661845b7</item><item name="android:colorControlActivated">#1845b7</item></style>
+ <style name="SurfAccentCobaltDark"><item name="android:colorAccent">#638aff</item><item name="android:textColorHighlight">#66638aff</item><item name="android:colorControlActivated">#638aff</item></style>
+ <style name="SurfAccentEmeraldLight"><item name="android:colorAccent">#006c42</item><item name="android:textColorHighlight">#66006c42</item><item name="android:colorControlActivated">#006c42</item></style>
+ <style name="SurfAccentEmeraldDark"><item name="android:colorAccent">#24ca78</item><item name="android:textColorHighlight">#6624ca78</item><item name="android:colorControlActivated">#24ca78</item></style>
+ <style name="SurfAccentOrangeLight"><item name="android:colorAccent">#974300</item><item name="android:textColorHighlight">#66974300</item><item name="android:colorControlActivated">#974300</item></style>
+ <style name="SurfAccentOrangeDark"><item name="android:colorAccent">#ff903d</item><item name="android:textColorHighlight">#66ff903d</item><item name="android:colorControlActivated">#ff903d</item></style>
+ <style name="SurfAccentMagentaLight"><item name="android:colorAccent">#a31472</item><item name="android:textColorHighlight">#66a31472</item><item name="android:colorControlActivated">#a31472</item></style>
+ <style name="SurfAccentMagentaDark"><item name="android:colorAccent">#f058bc</item><item name="android:textColorHighlight">#66f058bc</item><item name="android:colorControlActivated">#f058bc</item></style>
+ <style name="SurfAccentCyanLight"><item name="android:colorAccent">#006575</item><item name="android:textColorHighlight">#66006575</item><item name="android:colorControlActivated">#006575</item></style>
+ <style name="SurfAccentCyanDark"><item name="android:colorAccent">#31d2ef</item><item name="android:textColorHighlight">#6631d2ef</item><item name="android:colorControlActivated">#31d2ef</item></style>
+ <style name="SurfAccentPurpleLight"><item name="android:colorAccent">#6420a8</item><item name="android:textColorHighlight">#666420a8</item><item name="android:colorControlActivated">#6420a8</item></style>
+ <style name="SurfAccentPurpleDark"><item name="android:colorAccent">#b881ff</item><item name="android:textColorHighlight">#66b881ff</item><item name="android:colorControlActivated">#b881ff</item></style>
+ <style name="SurfAccentRoseLight"><item name="android:colorAccent">#ba3162</item><item name="android:textColorHighlight">#66ba3162</item><item name="android:colorControlActivated">#ba3162</item></style>
+ <style name="SurfAccentRoseDark"><item name="android:colorAccent">#ef6697</item><item name="android:textColorHighlight">#66ef6697</item><item name="android:colorControlActivated">#ef6697</item></style>
+ <style name="SurfAccentRubyLight"><item name="android:colorAccent">#c81e3c</item><item name="android:textColorHighlight">#66c81e3c</item><item name="android:colorControlActivated">#c81e3c</item></style>
+ <style name="SurfAccentRubyDark"><item name="android:colorAccent">#ff5573</item><item name="android:textColorHighlight">#66ff5573</item><item name="android:colorControlActivated">#ff5573</item></style>
+ <style name="SurfAccentLimeLight"><item name="android:colorAccent">#487200</item><item name="android:textColorHighlight">#66487200</item><item name="android:colorControlActivated">#487200</item></style>
+ <style name="SurfAccentLimeDark"><item name="android:colorAccent">#a4ce3a</item><item name="android:textColorHighlight">#66a4ce3a</item><item name="android:colorControlActivated">#a4ce3a</item></style>
+ <style name="SurfAccentOliveLight"><item name="android:colorAccent">#606d13</item><item name="android:textColorHighlight">#66606d13</item><item name="android:colorControlActivated">#606d13</item></style>
+ <style name="SurfAccentOliveDark"><item name="android:colorAccent">#a7b45a</item><item name="android:textColorHighlight">#66a7b45a</item><item name="android:colorControlActivated">#a7b45a</item></style>
+ <style name="SurfAccentMintLight"><item name="android:colorAccent">#007649</item><item name="android:textColorHighlight">#66007649</item><item name="android:colorControlActivated">#007649</item></style>
+ <style name="SurfAccentMintDark"><item name="android:colorAccent">#58d6a9</item><item name="android:textColorHighlight">#6658d6a9</item><item name="android:colorControlActivated">#58d6a9</item></style>
+ <style name="SurfAccentAquaLight"><item name="android:colorAccent">#007462</item><item name="android:textColorHighlight">#66007462</item><item name="android:colorControlActivated">#007462</item></style>
+ <style name="SurfAccentAquaDark"><item name="android:colorAccent">#42cdbb</item><item name="android:textColorHighlight">#6642cdbb</item><item name="android:colorControlActivated">#42cdbb</item></style>
+ <style name="SurfAccentAzureLight"><item name="android:colorAccent">#0f69b5</item><item name="android:textColorHighlight">#660f69b5</item><item name="android:colorControlActivated">#0f69b5</item></style>
+ <style name="SurfAccentAzureDark"><item name="android:colorAccent">#429ce8</item><item name="android:textColorHighlight">#66429ce8</item><item name="android:colorControlActivated">#429ce8</item></style>
+ <style name="SurfAccentIndigoLight"><item name="android:colorAccent">#6059c1</item><item name="android:textColorHighlight">#666059c1</item><item name="android:colorControlActivated">#6059c1</item></style>
+ <style name="SurfAccentIndigoDark"><item name="android:colorAccent">#8d86ee</item><item name="android:textColorHighlight">#668d86ee</item><item name="android:colorControlActivated">#8d86ee</item></style>
+ <style name="SurfAccentLavenderLight"><item name="android:colorAccent">#7956a6</item><item name="android:textColorHighlight">#667956a6</item><item name="android:colorControlActivated">#7956a6</item></style>
+ <style name="SurfAccentLavenderDark"><item name="android:colorAccent">#ba97e7</item><item name="android:textColorHighlight">#66ba97e7</item><item name="android:colorControlActivated">#ba97e7</item></style>
+ <style name="SurfAccentPlumLight"><item name="android:colorAccent">#99459e</item><item name="android:textColorHighlight">#6699459e</item><item name="android:colorControlActivated">#99459e</item></style>
+ <style name="SurfAccentPlumDark"><item name="android:colorAccent">#c975ce</item><item name="android:textColorHighlight">#66c975ce</item><item name="android:colorControlActivated">#c975ce</item></style>
+ <style name="SurfAccentPeachLight"><item name="android:colorAccent">#995621</item><item name="android:textColorHighlight">#66995621</item><item name="android:colorControlActivated">#995621</item></style>
+ <style name="SurfAccentPeachDark"><item name="android:colorAccent">#edaa75</item><item name="android:textColorHighlight">#66edaa75</item><item name="android:colorControlActivated">#edaa75</item></style>
+ <style name="SurfAccentGoldLight"><item name="android:colorAccent">#836200</item><item name="android:textColorHighlight">#66836200</item><item name="android:colorControlActivated">#836200</item></style>
+ <style name="SurfAccentGoldDark"><item name="android:colorAccent">#ddbc4a</item><item name="android:textColorHighlight">#66ddbc4a</item><item name="android:colorControlActivated">#ddbc4a</item></style>
 </resources>

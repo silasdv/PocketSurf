@@ -46,7 +46,44 @@ class SurfDownloads(private val context:Context){
  fun generatedProgress(id:Long,bytes:Long,complete:Boolean=false,failed:Boolean=false){save(stored().map{if(it.id==id&&it.status!=CANCELLED)it.copy(received=bytes,total=if(complete)bytes else 0,status=if(failed)DownloadManager.STATUS_FAILED else if(complete)DownloadManager.STATUS_SUCCESSFUL else DownloadManager.STATUS_RUNNING)else it})}
  companion object {
   const val CANCELLED=-1;const val MISSING=-2
-  fun status(item:SurfDownload)=when(item.status){DownloadManager.STATUS_PENDING->"Queued";DownloadManager.STATUS_RUNNING->if(item.total>0)"${item.received*100/item.total}% · ${bytes(item.received)} of ${bytes(item.total)}"else "Downloading · ${bytes(item.received)}";DownloadManager.STATUS_PAUSED->"Waiting for connection";DownloadManager.STATUS_SUCCESSFUL->"Completed · ${bytes(item.total)}";DownloadManager.STATUS_FAILED->"Failed · ${when(item.reason){DownloadManager.ERROR_INSUFFICIENT_SPACE->"Not enough storage";DownloadManager.ERROR_FILE_ALREADY_EXISTS->"File already exists";DownloadManager.ERROR_HTTP_DATA_ERROR->"Network error";else->"Download interrupted"}}";CANCELLED->"Cancelled";else->"File unavailable"}
+  private data class SpeedTracker(var lastBytes:Long=0,var lastTimeNanos:Long=0,var smoothedBytesPerSec:Double=0.0)
+  private val speedTrackers=java.util.concurrent.ConcurrentHashMap<Long,SpeedTracker>()
+
+  fun speedMBps(id:Long,received:Long):Double {
+   if(received<=0)return 0.0
+   val now=android.os.SystemClock.elapsedRealtimeNanos()
+   val tracker=speedTrackers.getOrPut(id){SpeedTracker(received,now,0.0)}
+   if(tracker.lastTimeNanos==0L){tracker.lastBytes=received;tracker.lastTimeNanos=now;return 0.0}
+   val dt=(now-tracker.lastTimeNanos)/1_000_000_000.0
+   if(dt>=0.3){
+    val deltaBytes=(received-tracker.lastBytes).coerceAtLeast(0)
+    val instantBytesPerSec=deltaBytes/dt
+    tracker.smoothedBytesPerSec=if(tracker.smoothedBytesPerSec==0.0)instantBytesPerSec else tracker.smoothedBytesPerSec*0.7+instantBytesPerSec*0.3
+    tracker.lastBytes=received
+    tracker.lastTimeNanos=now
+   }else if(now-tracker.lastTimeNanos>2_000_000_000L){
+    tracker.smoothedBytesPerSec=0.0
+   }
+   return tracker.smoothedBytesPerSec/(1024.0*1024.0)
+  }
+
+  fun status(item:SurfDownload):String {
+   if(item.status!=DownloadManager.STATUS_RUNNING)speedTrackers.remove(item.id)
+   return when(item.status){
+    DownloadManager.STATUS_PENDING->"Queued"
+    DownloadManager.STATUS_RUNNING->{
+     val speed=speedMBps(item.id,item.received)
+     val speedText=if(speed>=0.01)String.format(java.util.Locale.ENGLISH,"%.1f MB/s",speed)else null
+     val suffix=speedText?.let{" · $it"}.orEmpty()
+     if(item.total>0)"${item.received*100/item.total}% · ${bytes(item.received)} of ${bytes(item.total)}$suffix" else "Downloading · ${bytes(item.received)}$suffix"
+    }
+    DownloadManager.STATUS_PAUSED->"Waiting for connection"
+    DownloadManager.STATUS_SUCCESSFUL->"Completed · ${bytes(item.total)}"
+    DownloadManager.STATUS_FAILED->"Failed · ${when(item.reason){DownloadManager.ERROR_INSUFFICIENT_SPACE->"Not enough storage";DownloadManager.ERROR_FILE_ALREADY_EXISTS->"File already exists";DownloadManager.ERROR_HTTP_DATA_ERROR->"Network error";else->"Download interrupted"}}"
+    CANCELLED->"Cancelled"
+    else->"File unavailable"
+   }
+  }
   fun bytes(value:Long)=when {value<0->"Unknown size";value<1024->"$value B";value<1024*1024->String.format(java.util.Locale.ENGLISH,"%.1f KB",value/1024.0);else->String.format(java.util.Locale.ENGLISH,"%.1f MB",value/(1024.0*1024))}
  }
 }

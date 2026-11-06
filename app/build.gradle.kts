@@ -10,7 +10,7 @@ val releaseStore=signingValue("POCKETSURF_KEYSTORE_PATH","storeFile")
 android {
  namespace="org.pocketsurf.browser"; compileSdk=35
  buildFeatures { buildConfig=true }
- defaultConfig { applicationId="org.pocketsurf.browser"; minSdk=26; targetSdk=35; versionCode=32; versionName="1.3.1" }
+ defaultConfig { applicationId="org.pocketsurf.browser"; minSdk=26; targetSdk=35; versionCode=43; versionName="1.4.0" }
  compileOptions { sourceCompatibility=JavaVersion.VERSION_17; targetCompatibility=JavaVersion.VERSION_17 }
  kotlinOptions { jvmTarget="17" }
  signingConfigs.getByName("debug") { storeFile=rootProject.file(".local/debug.keystore") }
@@ -38,7 +38,7 @@ android {
   }
  }
 }
-dependencies { implementation("androidx.browser:browser:1.8.0"); implementation("androidx.webkit:webkit:1.14.0"); testImplementation("junit:junit:4.13.2"); testImplementation("org.robolectric:robolectric:4.14.1") }
+dependencies { implementation("com.squareup.okhttp3:okhttp:4.12.0"); testImplementation("com.squareup.okhttp3:mockwebserver:4.12.0"); implementation("androidx.browser:browser:1.8.0"); implementation("androidx.webkit:webkit:1.14.0"); testImplementation("junit:junit:4.13.2"); testImplementation("org.robolectric:robolectric:4.14.1") }
 val createLocalDebugKey by tasks.registering(Exec::class) {
  val key=rootProject.file(".local/debug.keystore"); onlyIf { !key.exists() }; doFirst { key.parentFile.mkdirs() }
  commandLine("${System.getProperty("java.home")}/bin/keytool", "-genkeypair", "-noprompt", "-keystore", key.absolutePath, "-storepass", "android", "-keypass", "android", "-alias", "androiddebugkey", "-dname", "CN=PocketSurf Debug", "-keyalg", "RSA", "-validity", "10000")

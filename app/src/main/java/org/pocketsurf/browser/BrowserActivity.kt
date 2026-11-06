@@ -29,7 +29,8 @@ open class BrowserActivity : Activity() {
  private var customOwner:String?=null
  private fun customEvent(t:Tab?,event:Int){if(isCustomTab&&t?.id==customOwner)runCatching{customSession?.callback?.onNavigationEvent(event,null)}}
  override fun getSharedPreferences(name:String,mode:Int):android.content.SharedPreferences=if(isPrivateSession)applicationContext.getSharedPreferences(name,mode)else super.getSharedPreferences(name,mode)
- data class Tab(val id:String=UUID.randomUUID().toString(),var url:String="",var title:String="New tab",var home:Boolean=url.isBlank(),var progress:Int=100,var loadError:String?=null,var state:Bundle?=null,var view:WebView?=null,var preview:Bitmap?=null,var previewReady:Boolean=false,var lastUsed:Long=0,var scrollX:Int=0,var scrollY:Int=0,var restoreScroll:Boolean=false,var generation:Long=0,var formProtected:Boolean=false,var mediaProtected:Boolean=false,var trail:MutableList<String> = mutableListOf(),var trailIndex:Int=0,var manualHistory:Boolean=false,var historyReplay:Boolean=false,var transferActive:Boolean=false,var zoomPercent:Int=100,var zoomBase:Float=0f,var desktopScript:androidx.webkit.ScriptHandler?=null)
+ enum class LoadReason { INITIAL, NAVIGATION, USER_RELOAD, BACKGROUND_RESTORE, AUTOMATIC_RECOVERY }
+ data class Tab(val id:String=UUID.randomUUID().toString(),var url:String="",var title:String="New tab",var home:Boolean=url.isBlank(),var progress:Int=100,var loadError:String?=null,var state:Bundle?=null,var view:WebView?=null,var preview:Bitmap?=null,var previewReady:Boolean=false,var lastUsed:Long=0,var scrollX:Int=0,var scrollY:Int=0,var restoreScroll:Boolean=false,var generation:Long=0,var formProtected:Boolean=false,var mediaProtected:Boolean=false,var trail:MutableList<String> = mutableListOf(),var trailIndex:Int=0,var manualHistory:Boolean=false,var historyReplay:Boolean=false,var transferActive:Boolean=false,var zoomPercent:Int=100,var zoomBase:Float=0f,var desktopScript:androidx.webkit.ScriptHandler?=null,var loadReason:LoadReason=LoadReason.INITIAL)
  private data class FocusNode(val view:View,val row:Int,val col:Int)
  private data class MenuItem(val icon:String,val title:String,val subtitle:String="",val siteUrl:String?=null,val action:()->Unit)
  private val prefs by lazy {getSharedPreferences("browser",MODE_PRIVATE)}
@@ -37,8 +38,12 @@ open class BrowserActivity : Activity() {
  private val favicons by lazy {FaviconStore(this)}
  private val adblock by lazy {AdBlocker(this)}
  private val cookieConsent by lazy {CookieConsent(this)}
- private var setupPending=false
  private val data by lazy {BrowserData(prefs)}
+ private val siteNames by lazy {SiteNames(prefs)}
+ private val dataChanges=android.content.SharedPreferences.OnSharedPreferenceChangeListener{_,key->
+  if(key=="history"||key=="search_queries")if(addressEditing)refreshSearchHistory()
+  if((key=="history"||key=="bookmarks")&&screen=="bookmarks")collectionRefresh?.invoke()
+ }
  private val downloads by lazy {SurfDownloads(this)}
  private val bindings by lazy {ControllerBindings(prefs)}
  private val controller=ControllerInput()
@@ -77,6 +82,7 @@ open class BrowserActivity : Activity() {
  private var remapTarget:Control?=null
  private val nativeFocus=mutableMapOf<String,Pair<Int,Int>>()
  private var searchTarget:Tab?=null
+ private var searchWasSurfBar=false
  private var searchReturn:(()->Unit)?=null
  private val collectionQueries=mutableMapOf<String,String>()
  private var collectionUndo:Pair<String,Visit>?=null
@@ -183,9 +189,8 @@ open class BrowserActivity : Activity() {
  private var shortcutUndo:Shortcut?=null
  private val tab get()=tabs.getOrNull(active)
  private val web get()=tab?.view
- private val theme get()=BrowserTheme.resolve(prefs.getString("theme","Dark")!!,resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK==Configuration.UI_MODE_NIGHT_YES,prefs.getString("accent",null))
+ private val theme get()=BrowserTheme.resolve(prefs.getString("theme","OLED")!!,resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK==Configuration.UI_MODE_NIGHT_YES,prefs.getString("accent",null))
  private val layoutScale get()=max(1f,resources.configuration.fontScale)
- private val touchComfort get()=prefs.getBoolean("comfort_touch",false)
  private fun uiDp(value:Int)=dp((value*layoutScale).roundToInt())
  private fun dockHeight()=if(screen=="tabs"&&tabDock!=null)uiDp(if(resources.configuration.screenWidthDp<600)112 else 56)else 0
  private fun footerHeight()=if(video!=null)0 else uiDp(if((layoutScale>1.3f||resources.configuration.screenWidthDp<600)&&screen=="page"&&popupLayer==null&&!addressEditing&&!webEditing)42 else 24)
@@ -195,15 +200,16 @@ open class BrowserActivity : Activity() {
  private fun row()=LinearLayout(this).apply {orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL}
  private fun shape(color:Int,radius:Int=14,stroke:Int=Color.TRANSPARENT,width:Int=1)=GradientDrawable().apply {setColor(color);cornerRadius=dp(radius).toFloat();setStroke(dp(width),stroke)}
  private fun border()=if(Color.luminance(theme.background)>.5)0x1f000000 else 0x20ffffff
- private fun margin(w:Int=-1,h:Int=-2,left:Int=0,top:Int=0,right:Int=0,bottom:Int=0):LinearLayout.LayoutParams {val small=h in 12..54;val height=if(h<0)h else if(small)uiDp(if(touchComfort&&h in 28..40)if(w<0)52 else 48 else h)else dp(h);val width=if(w<0)w else if(small&&w in 12..48)uiDp(if(touchComfort&&w in 28..47)48 else w)else dp(w);return LinearLayout.LayoutParams(width,height).apply{setMargins(dp(left),dp(top),dp(right),dp(bottom))}}
+ private fun margin(w:Int=-1,h:Int=-2,left:Int=0,top:Int=0,right:Int=0,bottom:Int=0):LinearLayout.LayoutParams {val small=h in 12..54;val height=if(h<0)h else if(small)uiDp(h)else dp(h);val width=if(w<0)w else if(small&&w in 12..48)uiDp(w)else dp(w);return LinearLayout.LayoutParams(width,height).apply{setMargins(dp(left),dp(top),dp(right),dp(bottom))}}
 
  private fun icon(name:String,size:Int=22,color:Int=theme.text)=ImageView(this).apply {setImageDrawable(SurfIcon(name,color));imageTintList=android.content.res.ColorStateList.valueOf(color);layoutParams=LinearLayout.LayoutParams(dp(size),dp(size));importantForAccessibility=View.IMPORTANT_FOR_ACCESSIBILITY_NO}
  private fun focusSurface():Int{fun channel(a:Int,b:Int)=(a*.86f+b*.14f).roundToInt()
  return Color.rgb(channel(Color.red(theme.surface),Color.red(theme.accent)),channel(Color.green(theme.surface),Color.green(theme.accent)),channel(Color.blue(theme.surface),Color.blue(theme.accent)))}
  private fun focusOutline(view:View,row:Int,focusedNow:Boolean):android.graphics.drawable.Drawable?{
   if(row<=-2)return if(focusedNow&&view!==addressField)shape(Color.TRANSPARENT,8,theme.accent,1)else null
+  if(view.contentDescription?.toString()?.startsWith("Accent: ")==true)return AccentSelection(theme.text,theme.accent,focusedNow,view.isSelected,resources.displayMetrics.density)
   val outline=shape(Color.TRANSPARENT,14,if(focusedNow)theme.accent else border(),if(focusedNow)2 else 1)
-  return if(view.isSelected)android.graphics.drawable.LayerDrawable(arrayOf(outline,SelectedTick(theme.accent,resources.displayMetrics.density)))else outline
+  return if(view.isSelected)android.graphics.drawable.LayerDrawable(arrayOf(outline,SelectedTick(theme.text,resources.displayMetrics.density)))else outline
  }
  private fun paintActionIcon(view:View,r:Int,selected:Boolean){
   if(view !is ViewGroup||!(r<=-2&&view!==addressField||popupLayer!=null))return
@@ -218,15 +224,39 @@ open class BrowserActivity : Activity() {
   isFocusable=false
  }
  private fun resetArrival(view:View){view.animate().cancel();view.alpha=1f;view.translationY=0f}
- private fun animateArrival(view:View){resetArrival(view);if(!resumed||!android.animation.ValueAnimator.areAnimatorsEnabled())return;view.alpha=0f;view.translationY=dp(4).toFloat();view.animate().alpha(1f).translationY(0f).setDuration(260).setInterpolator(android.view.animation.DecelerateInterpolator()).start()}
+ private var refreshingAppearance=false
+ private fun animateArrival(view:View){resetArrival(view);if(refreshingAppearance||!resumed||!android.animation.ValueAnimator.areAnimatorsEnabled())return;view.alpha=0f;view.translationY=dp(4).toFloat();view.animate().alpha(1f).translationY(0f).setDuration(260).setInterpolator(android.view.animation.DecelerateInterpolator()).start()}
  private fun bindFocus(view:View,r:Int,c:Int,action:(()->Unit)?=null,chosen:Boolean=false){
   view.isFocusable=true;view.isFocusableInTouchMode=view is EditText||!touchMode;view.isSelected=chosen;view.isDuplicateParentStateEnabled=false;if(view !is EditText)view.accessibilityDelegate=object:View.AccessibilityDelegate(){override fun onInitializeAccessibilityNodeInfo(host:View,info:android.view.accessibility.AccessibilityNodeInfo){super.onInitializeAccessibilityNodeInfo(host,info);info.className="android.widget.Button"}}
-  fun paint(has:Boolean){val focus=has&&(r>-2||chromeFocus);if(screen=="tabs"&&view.getTag(TAG_TAB)!=null){view.animate().scaleX(if(focus&&!touchMode)1.025f else 1f).scaleY(if(focus&&!touchMode)1.025f else 1f).setDuration(160).start()};view.background=android.graphics.drawable.RippleDrawable(android.content.res.ColorStateList.valueOf((theme.accent and 0x00ffffff) or 0x33000000),shape(if(focus&&!touchMode)focusSurface() else theme.surface,14),shape(Color.WHITE,14));if(r<=-2&&view !is EditText)view.background=null;view.foreground=focusOutline(view,r,focus&&!touchMode);paintActionIcon(view,r,focus&&!touchMode)}
+  fun paint(has:Boolean){if(view is HistoryBubbleView){view.update(has);return};if(view is SearchSuggestionView){view.update(has);return};val focus=has&&(r>-2||chromeFocus);if(screen=="tabs"&&view.getTag(TAG_TAB)!=null){view.animate().scaleX(if(focus&&!touchMode)1.025f else 1f).scaleY(if(focus&&!touchMode)1.025f else 1f).setDuration(160).start()};if(::addressField.isInitialized&&view===addressField&&::addressHost.isInitialized){view.background=null;(addressHost.background as? android.graphics.drawable.GradientDrawable)?.setColor(if(focus&&!touchMode)focusSurface()else theme.surface)}else view.background=android.graphics.drawable.RippleDrawable(android.content.res.ColorStateList.valueOf((theme.accent and 0x00ffffff) or 0x33000000),shape(if(focus&&!touchMode)focusSurface() else theme.surface,14),shape(Color.WHITE,14));if((r<=-2&&view !is EditText)||view.contentDescription?.toString()?.startsWith("Accent: ")==true)view.background=null;view.foreground=focusOutline(view,r,focus&&!touchMode);paintActionIcon(view,r,focus&&!touchMode)}
   if(r<=-2&&view !is EditText){view.background=android.graphics.drawable.StateListDrawable().apply{addState(intArrayOf(android.R.attr.state_pressed),shape(theme.surface,12));addState(intArrayOf(),shape(Color.TRANSPARENT,12))}}
   paint(false)
-    view.setOnFocusChangeListener {v,has->paint(has);if(has&&(r>-2||chromeFocus)){focused=v;if(screen=="tabs"){val i=(v.getTag(TAG_TAB)?:v.getTag(TAG_CLOSE)) as? Int;if(i!=null){selected=i;refreshJumpHints()}};updateLegend()}}
+    tintNativeIcons(view,chosen)
+    view.setOnHoverListener { v,event ->
+     tintNativeIcons(v,event.actionMasked!=MotionEvent.ACTION_HOVER_EXIT||v.hasFocus()&&!touchMode||v.isSelected)
+     false
+    }
+    view.setOnFocusChangeListener {v,has->paint(has);tintNativeIcons(v,has&&!touchMode||v.isSelected);if(has&&(r>-2||chromeFocus)){focused=v;if(screen=="tabs"){val i=(v.getTag(TAG_TAB)?:v.getTag(TAG_CLOSE)) as? Int;if(i!=null){selected=i;refreshJumpHints()}};updateLegend()}}
   if(action!=null)view.setOnClickListener {if(!touchMode)view.requestFocus();action()}
   focusNodes.add(FocusNode(view,r,c))
+ }
+ private fun tintNativeIcons(view:View,selected:Boolean){
+  if(view.tag=="neutral-controller-badge")return
+  if(view is ImageView&&view.drawable is SurfIcon){val color=if(selected)theme.accent else theme.text;view.imageTintList=android.content.res.ColorStateList.valueOf(color);view.setColorFilter(color,PorterDuff.Mode.SRC_IN)}
+  if(view is SiteIconView||view is HistoryBubbleView||view is SearchSuggestionView)return
+  if(view is ViewGroup)for(i in 0 until view.childCount)tintNativeIcons(view.getChildAt(i),selected)
+ }
+ private fun fadeNativeSelection(view:View?){
+  if(view==null||touchMode||!android.animation.ValueAnimator.areAnimatorsEnabled())return
+  val highlight=view.foreground?.constantState?.newDrawable()?.mutate()?:return
+  highlight.setBounds(0,0,view.width,view.height)
+  view.overlay.add(highlight)
+  android.animation.ValueAnimator.ofInt(255,0).apply{
+   duration=120
+   addUpdateListener{highlight.alpha=it.animatedValue as Int}
+   addListener(object:android.animation.AnimatorListenerAdapter(){override fun onAnimationEnd(animation:android.animation.Animator){view.overlay.remove(highlight)}})
+   start()
+  }
  }
  private val jumpHints=mutableListOf<Pair<Int,FrameLayout>>()
  private fun inlineHint(action:Control):View=badge(action,true,theme.text).apply{tag=TAG_HINT;isClickable=false;isFocusable=false;importantForAccessibility=View.IMPORTANT_FOR_ACCESSIBILITY_NO;alpha=.72f;background=null;if(this is TextView){gravity=Gravity.END or Gravity.CENTER_VERTICAL;text=when(bindings.label(action)){"L1"->"L";"R1"->"R";else->bindings.label(action)};setTextSize(android.util.TypedValue.COMPLEX_UNIT_DIP,if(bindings.label(action) in listOf("Start","Select"))5.5f else 6.5f);includeFontPadding=false};setTag(TAG_HINT_ACTION,action);contentDescription="Shortcut: ${bindings.label(action)}"}
@@ -234,7 +264,7 @@ open class BrowserActivity : Activity() {
  private fun hintWidth(action:Control)=if(bindings.label(action) in listOf("Start","Select"))22 else if(bindings.label(action) in listOf("cross","circle","square","triangle"))14 else if(bindings.label(action).length>2)22 else 14
  private fun cornerParams(width:Int)=FrameLayout.LayoutParams(dp(width),dp(9),Gravity.END or Gravity.BOTTOM).apply{rightMargin=dp(2);bottomMargin=dp(2)}
  private fun addInlineShortcut(button:FrameLayout,action:Control){for(i in button.childCount-1 downTo 1)if(button.getChildAt(i).tag==TAG_HINT)button.removeViewAt(i);(button.getChildAt(0) as? ImageView)?.layoutParams=FrameLayout.LayoutParams(dp(18),dp(18),Gravity.CENTER);button.addView(inlineHint(action),cornerParams(hintWidth(action)))}
- private fun updateShortcutVisibility(){if(!::toolbar.isInitialized)return;tabRow.descendantFocusability=ViewGroup.FOCUS_BLOCK_DESCENDANTS;fun walk(v:View){if(v.tag==TAG_HINT){val action=v.getTag(TAG_HINT_ACTION) as? Control;val usable=screen in listOf("page","tabs")&&popupLayer==null&&(!addressEditing||v.parent===addressHost)&&when(action){Control.HISTORY_BACK->backButton.isEnabled;Control.HISTORY_FORWARD->forwardButton.isEnabled;Control.SEARCH->screen=="page";Control.MENU->screen=="page";Control.TABS->screen=="page";Control.CONTEXT->true;else->screen=="page"};v.visibility=if(usable)View.VISIBLE else View.INVISIBLE;return};if(v is ViewGroup)for(i in 0 until v.childCount)walk(v.getChildAt(i))};walk(toolbar);walk(tabNavigation);tabDock?.let{walk(it)}}
+ private fun updateShortcutVisibility(){if(!::toolbar.isInitialized)return;tabRow.descendantFocusability=ViewGroup.FOCUS_BLOCK_DESCENDANTS;fun walk(v:View){if(v.tag==TAG_HINT){val action=v.getTag(TAG_HINT_ACTION) as? Control;val usable=screen in listOf("page","tabs")&&popupLayer==null&&(!addressEditing||v.parent===addressHost)&&when(action){Control.HISTORY_BACK,Control.HISTORY_FORWARD->screen=="page";Control.SEARCH->screen=="page";Control.MENU->screen=="page";Control.TABS->screen=="page";Control.CONTEXT->true;else->screen=="page"};v.visibility=if(usable)View.VISIBLE else View.INVISIBLE;if(v is TextView&&(action==Control.HISTORY_BACK||action==Control.HISTORY_FORWARD)){val enabled=if(action==Control.HISTORY_BACK)backButton.isEnabled else forwardButton.isEnabled;v.setTextColor(if(enabled)theme.text else theme.secondary)};return};if(v is ViewGroup)for(i in 0 until v.childCount)walk(v.getChildAt(i))};walk(toolbar);walk(tabNavigation);tabDock?.let{walk(it)}}
  private fun jumpHint(index:Int):FrameLayout=FrameLayout(this).also{jumpHints.add(index to it);updateJumpHint(index,it)}
  private fun updateJumpHint(index:Int,host:FrameLayout){host.removeAllViews();val order=if(screen=="tabs")tabs.indices.filter{tabs[it].title.contains(tabQuery,true)||tabs[it].url.contains(tabQuery,true)}else tabs.indices.toList();val reference=order.indexOf(if(screen=="tabs")selected else active);val action=when(index){order.getOrNull(reference-1)->Control.PREVIOUS_TAB;order.getOrNull(reference+1)->Control.NEXT_TAB;else->null};host.visibility=if(action==null)View.INVISIBLE else View.VISIBLE;host.minimumWidth=dp(max(hintWidth(Control.PREVIOUS_TAB),hintWidth(Control.NEXT_TAB)));if(action!=null)host.addView(inlineHint(action),FrameLayout.LayoutParams(dp(hintWidth(action)),dp(9),Gravity.CENTER))}
  private fun refreshJumpHints(){jumpHints.forEach{(i,v)->updateJumpHint(i,v)}}
@@ -245,13 +275,13 @@ open class BrowserActivity : Activity() {
  }
  private fun tile(item:MenuItem,r:Int,c:Int):View=row().apply {
   setPadding(dp(18),dp(14),dp(18),dp(14));minimumHeight=dp(68)
-  addView(item.siteUrl?.let{siteIcon(it,24)}?:icon(item.icon,24,theme.accent),margin(24,24,right=16))
+  addView(item.siteUrl?.let{siteIcon(it,24)}?:icon(item.icon,24,theme.text),margin(24,24,right=16))
   addView(column().apply {addView(text(item.title,16f,bold=true).apply {maxLines=1;ellipsize=TextUtils.TruncateAt.END});if(item.subtitle.isNotBlank())addView(text(item.subtitle,12f,theme.secondary).apply {maxLines=1;ellipsize=TextUtils.TruncateAt.END;setPadding(0,dp(5),0,0)})},LinearLayout.LayoutParams(0,-2,1f))
   addView(icon("forward",16,theme.secondary),margin(16,16,left=10));bindFocus(this,r,c,item.action)
  }
  private fun actionChip(title:String,icon:String,r:Int,c:Int,action:()->Unit)=row().apply {
   contentDescription=title
-  minimumHeight=dp(48);gravity=Gravity.CENTER;setPadding(dp(16),dp(10),dp(16),dp(10));addView(this@BrowserActivity.icon(icon,18,theme.accent),margin(18,18,right=10));addView(text(title,14f,bold=true));bindFocus(this,r,c,action)
+  minimumHeight=dp(48);gravity=Gravity.CENTER;setPadding(dp(16),dp(10),dp(16),dp(10));addView(this@BrowserActivity.icon(icon,18,theme.text),margin(18,18,right=10));addView(text(title,14f,bold=true));bindFocus(this,r,c,action)
  }
  private fun focusFirst(){val saved=nativeFocus[screen];val node=focusNodes.firstOrNull{it.row==saved?.first&&it.col==saved?.second&&it.view.isEnabled&&isVisibleTree(it.view)}?:focusNodes.firstOrNull{it.row>=0&&it.view.isEnabled&&isVisibleTree(it.view)}?:focusNodes.firstOrNull{it.view.isEnabled&&isVisibleTree(it.view)};focused=node?.view;node?.view?.let{v->v.requestFocus();v.post{if(focused===v)v.requestFocus()}}}
  private fun isVisibleTree(view:View):Boolean {var v:View?=view;while(v!=null){if(v.visibility!=View.VISIBLE)return false;v=v.parent as? View};return true}
@@ -261,8 +291,20 @@ open class BrowserActivity : Activity() {
   if(popupKind=="pointer"&&focused is SeekBar&&direction in listOf("left","right")){val slider=focused as SeekBar;slider.progress=(slider.progress+if(direction=="left")-10 else 10).coerceIn(0,slider.max);return}
   val current=focusNodes.firstOrNull{it.view===focused}?:focusNodes.firstOrNull{it.view.hasFocus()}
   if(current==null){focusFirst();return}
+  if(addressEditing){
+   val visible=focusNodes.filter{it.view.isShown&&it.view.isEnabled}
+   val target=when{
+    direction=="up"&&current.row>=0->if(current.col>0||current.row==0)addressField else visible.firstOrNull{it.col==0&&it.row==current.row-1}?.view
+    direction=="down"&&current.row<0->visible.firstOrNull{it.row>=0}?.view
+    direction=="right"&&current.row>=0&&current.col==0->visible.firstOrNull{it.row==0&&it.col==1}?.view
+    direction=="left"&&current.row==0&&current.col==1->visible.firstOrNull{it.row==0&&it.col==0}?.view?:addressField
+    else->null
+   }
+   if(target!=null){focused=target;target.requestFocus();return}
+   if(current.row>=0&&direction in listOf("up","down")&&current.col>0)return
+  }
   if(screen=="page"&&popupLayer==null){
-   if(direction=="up"&&current.row>=0&&focusNodes.none{it.row>=0&&it.row<current.row}){focusChrome();return}
+   if(direction=="up"&&current.row>=0&&focusNodes.none{it.row>=0&&it.row<current.row}){val favorite=focusNodes.filter{it.row==-1&&it.view.isShown&&it.view.isEnabled}.minByOrNull{abs(it.col-current.col)};if(favorite!=null){chromeFocus=true;focused=favorite.view;favorite.view.requestFocus();updateLegend()}else focusChrome();return}
    if(addressEditing&&current.row==-2&&direction=="down"){focusNodes.firstOrNull{it.row>=0}?.view?.let{focused=it;it.requestFocus()};return}
    if(surfBarActive&&!addressEditing&&current.row==-2){
     if(direction in listOf("up","down"))return
@@ -270,8 +312,8 @@ open class BrowserActivity : Activity() {
     nodes.getOrNull(next)?.view?.let{focused=it;it.requestFocus();it.requestRectangleOnScreen(Rect(0,0,it.width,it.height),false);syncFocusMode()};return
    }
    if(direction=="down"&&current.row==-3){focusChrome();return}
-   if(current.row==-1&&direction=="up"){focusChrome();return};if(current.row==-1&&direction=="down"){focusPageNeutral();return}
-   if(direction=="down"&&current.row==-2){val favorite=focusNodes.firstOrNull{it.view.getTag(TAG_FAVORITE)==true};if(favorite!=null){chromeFocus=true;focused=favorite.view;favorite.view.requestFocus();return};chromeFocus=false;val first=focusNodes.firstOrNull{it.row>=0};if(first!=null){focused=first.view;first.view.requestFocus()}else{focused=null;web?.requestFocus();web?.evaluateJavascript("window.__pocketSurf && window.__pocketSurf.move('down')",null)};return}
+   if(current.row==-1&&direction=="up"){focusChrome();return};if(current.row==-1&&direction=="down"){if(tab?.home!=false){val first=focusNodes.filter{it.row>=0&&it.view.isShown&&it.view.isEnabled}.minByOrNull{it.row*100+abs(it.col-current.col)};if(first!=null){chromeFocus=false;focused=first.view;first.view.requestFocus();first.view.requestRectangleOnScreen(Rect(0,0,first.view.width,first.view.height),false);updateLegend()}}else focusPageNeutral();return}
+   if(direction=="down"&&current.row==-2){val favorite=focusNodes.firstOrNull{it.view.getTag(TAG_FAVORITE)==true&&it.view.isShown};if(favorite!=null){chromeFocus=true;focused=favorite.view;favorite.view.requestFocus();return};chromeFocus=false;val first=focusNodes.firstOrNull{it.row>=0};if(first!=null){focused=first.view;first.view.requestFocus()}else{focused=null;web?.requestFocus();web?.evaluateJavascript("window.__pocketSurf && window.__pocketSurf.move('down')",null)};return}
   }
   val dx=when(direction){"left"->-1;"right"->1;else->0};val dy=when(direction){"up"->-1;"down"->1;else->0}
   val target=focusNodes.filter {it.view.visibility==View.VISIBLE&&isVisibleTree(it.view)&&it.view.isEnabled&&it!==current&&((direction!="left"&&direction!="right")||it.row==current.row)}.mapNotNull {n->
@@ -292,7 +334,13 @@ open class BrowserActivity : Activity() {
   window.statusBarColor=theme.background;window.navigationBarColor=theme.background;window.decorView.systemUiVisibility=if(Color.luminance(theme.background)>.5)View.SYSTEM_UI_FLAG_FULLSCREEN or View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR else 0
   root=column().apply {setBackgroundColor(theme.background)}
   if(Build.VERSION.SDK_INT>=30)window.setDecorFitsSystemWindows(false)
-  root.setOnApplyWindowInsetsListener {v,i->if(Build.VERSION.SDK_INT>=30){val bars=i.getInsets(WindowInsets.Type.systemBars() or WindowInsets.Type.displayCutout());val keyboard=i.getInsets(WindowInsets.Type.ime());onImeVisibilityChanged(i.isVisible(WindowInsets.Type.ime()));v.setPadding(bars.left,bars.top,bars.right,max(bars.bottom,keyboard.bottom));if(!i.isVisible(WindowInsets.Type.ime())&&!imeExpected&&webEditing)leaveWebEditing()}else v.setPadding(i.systemWindowInsetLeft,i.systemWindowInsetTop,i.systemWindowInsetRight,i.systemWindowInsetBottom);i}
+  root.setOnApplyWindowInsetsListener {v,i->if(Build.VERSION.SDK_INT>=30){val bars=i.getInsets(WindowInsets.Type.systemBars() or WindowInsets.Type.displayCutout());val keyboard=i.getInsets(WindowInsets.Type.ime());onImeVisibilityChanged(i.isVisible(WindowInsets.Type.ime()));v.setPadding(bars.left,bars.top,bars.right,searchSafeBottom(max(bars.bottom,keyboard.bottom),i.isVisible(WindowInsets.Type.ime())));if(!i.isVisible(WindowInsets.Type.ime())&&!imeExpected&&webEditing)leaveWebEditing()}else v.setPadding(i.systemWindowInsetLeft,i.systemWindowInsetTop,i.systemWindowInsetRight,i.systemWindowInsetBottom);i}
+  if(Build.VERSION.SDK_INT>=30)root.setWindowInsetsAnimationCallback(object:WindowInsetsAnimation.Callback(DISPATCH_MODE_CONTINUE_ON_SUBTREE){
+   override fun onProgress(insets:WindowInsets,running:MutableList<WindowInsetsAnimation>):WindowInsets {
+    val bars=insets.getInsets(WindowInsets.Type.systemBars() or WindowInsets.Type.displayCutout());val ime=insets.getInsets(WindowInsets.Type.ime())
+    root.setPadding(bars.left,bars.top,bars.right,searchSafeBottom(max(bars.bottom,ime.bottom),insets.isVisible(WindowInsets.Type.ime())));return insets
+   }
+  })
   tabRow=row().apply{setPadding(dp(10),dp(5),dp(10),dp(3))}
   tabStrip=HorizontalScrollView(this).apply {isHorizontalScrollBarEnabled=false;addView(tabRow);setBackgroundColor(theme.background);addOnLayoutChangeListener{_,l,_,r,_,ol,_,orr,_->if(r-l!=orr-ol&&screen=="page")post{if(screen=="page")updateChrome()}}}
   tabActions=row();previousTrigger=tabTrigger(true);nextTrigger=tabTrigger(false);tabNavigation=row().apply{setBackgroundColor(theme.background);addView(previousTrigger,margin(32,-1));addView(tabStrip,LinearLayout.LayoutParams(0,-1,1f));addView(nextTrigger,margin(32,-1))};root.addView(tabNavigation,margin(-1,36,bottom=4))
@@ -304,20 +352,21 @@ open class BrowserActivity : Activity() {
   pointer=MousePointer(this).apply {isClickable=false;isFocusable=false;importantForAccessibility=View.IMPORTANT_FOR_ACCESSIBILITY_NO}
   if(Build.VERSION.SDK_INT>=29){root.isForceDarkAllowed=false;window.decorView.isForceDarkAllowed=false}
   setContentView(root)
+  prefs.registerOnSharedPreferenceChangeListener(dataChanges)
   getSystemService(android.hardware.input.InputManager::class.java).registerInputDeviceListener(deviceListener,handler)
   if(isCustomTab&&savedInstanceState!=null){val saved=JSONArray(savedInstanceState.getString("custom_tabs","[]"));for(i in 0 until saved.length())tabs.add(readTab(saved.getJSONObject(i)));active=savedInstanceState.getInt("custom_active",0).coerceAtMost(tabs.lastIndex);customOwner=savedInstanceState.getString("custom_owner")}
-  restoreSession();if(savedInstanceState==null&&intent?.action==Intent.ACTION_MAIN&&intent?.data==null)newTab()else showPage()
+  restoreSession();if(savedInstanceState==null&&intent?.action==Intent.ACTION_MAIN&&intent?.data==null){newTab();showSearch()}else showPage()
   if(savedInstanceState==null)intent?.data?.let {if(it.scheme in listOf("http","https"))openUrl(it.toString(),new=true);if(isCustomTab)customOwner=tab?.id}
   settingsFocus=savedInstanceState?.getString("settings_focus");settingsCategory=savedInstanceState?.getString("settings_category");surfDestination=savedInstanceState?.getString("surf_destination");when(savedInstanceState?.getString("destination")){"pointer_settings"->showPointerSettings();"mouse_settings"->showMouseSettings();"bookmarks_bar"->showBookmarksBarSettings();"cookie_settings"->showCookieSettings();"private_info"->showPrivateInfo();"reading_settings"->showReadingSettings();"backup"->showBackup();"website_info"->showWebsiteInfo();"reader"->renderReader();"home_settings"->showHomeSettings();"adblock"->showAdblock();"shortcut_picker"->showShortcutPicker();"controller_buttons"->showControllerButtons(directionalMapping);"settings_category"->showSettingsCategory(settingsCategory?:"browsing");"settings"->showSettings();"appearance"->showAppearance();"controller"->showController();"history"->showCollection("history");"bookmarks"->showCollection("bookmarks");"downloads"->showDownloads();"tabs"->showTabs()}
   if(Build.VERSION.SDK_INT>=33)onBackInvokedDispatcher.registerOnBackInvokedCallback(android.window.OnBackInvokedDispatcher.PRIORITY_DEFAULT){systemBack()}
 
-  if(!prefs.getBoolean(SetupActivity.COMPLETE,false)&&savedInstanceState==null){setupPending=true;startActivityForResult(Intent(this,SetupActivity::class.java),SETUP_REQUEST)}
  }
  private fun tabTrigger(previous:Boolean):View=FrameLayout(this).apply{
   tag="${bindings.label(if(previous)Control.PREVIOUS_TAB else Control.NEXT_TAB)}:${theme.text}"
   addView(shortcutBadge(if(previous)Control.PREVIOUS_TAB else Control.NEXT_TAB,previous),FrameLayout.LayoutParams(dp(32),dp(22),Gravity.CENTER));isFocusable=false
  }
  private fun buildToolbar(){
+  tabChromeSignature=""
   toolbar=row().apply{setPadding(dp(6),0,dp(6),0);setBackgroundColor(theme.background)}
   fun navigation(name:String,label:String,action:Control,run:()->Unit):View=iconButton(name,label,run).apply{
    minimumWidth=dp(28);minimumHeight=dp(32);(getChildAt(0) as ImageView).layoutParams=FrameLayout.LayoutParams(dp(17),dp(17),Gravity.CENTER)
@@ -328,18 +377,18 @@ open class BrowserActivity : Activity() {
   addressField=EditText(this).apply{setSingleLine();textSize=13f;setTextColor(theme.text);setHintTextColor(theme.secondary);setPadding(dp(12),dp(6),dp(38),dp(6));background=shape(theme.surface,12);hint="Search ${engineName()} or enter address";contentDescription="Address or ${engineName()} search";showSoftInputOnFocus=false;inputType=android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_URI;imeOptions=android.view.inputmethod.EditorInfo.IME_ACTION_GO or android.view.inputmethod.EditorInfo.IME_FLAG_NO_EXTRACT_UI or android.view.inputmethod.EditorInfo.IME_FLAG_NO_FULLSCREEN;importantForAutofill=View.IMPORTANT_FOR_AUTOFILL_NO;setSelectAllOnFocus(true);setOnClickListener{val editing=addressEditing;showSearch();if(!editing)post{if(addressEditing)selectAll()}}}
   var addressTap=false;var tapX=0f;var tapY=0f
   addressField.setOnTouchListener{v,e->when(e.actionMasked){MotionEvent.ACTION_DOWN->{addressTap=true;tapX=e.x;tapY=e.y;false};MotionEvent.ACTION_MOVE->{if(abs(e.x-tapX)>ViewConfiguration.get(this).scaledTouchSlop||abs(e.y-tapY)>ViewConfiguration.get(this).scaledTouchSlop)addressTap=false;false};MotionEvent.ACTION_UP->{val activate=addressTap&&!addressEditing;addressTap=false;if(activate){showSearch();v.performClick();true}else false};MotionEvent.ACTION_CANCEL->{addressTap=false;false};else->false}}
-  addressText=addressField;addressHost=FrameLayout(this).apply{addView(addressField,FrameLayout.LayoutParams(-1,-1))}
+  addressText=addressField;addressHost=FrameLayout(this).apply{background=shape(theme.surface,12);addressField.background=null;addView(addressField,FrameLayout.LayoutParams(-1,-1))}
   goButton=iconButton("send","Go"){submitAddress()}.apply{isFocusable=false;isFocusableInTouchMode=false;minimumWidth=dp(30);minimumHeight=dp(30);background=null;(getChildAt(0) as ImageView).layoutParams=FrameLayout.LayoutParams(dp(17),dp(17),Gravity.CENTER)}
   addressHost.addView(goButton,FrameLayout.LayoutParams(dp(30),-1,Gravity.END).apply{rightMargin=dp(3)})
-  toolbar.addView(addressHost,LinearLayout.LayoutParams(0,uiDp(if(touchComfort)48 else 36),1f).apply{setMargins(dp(4),0,dp(6),0)})
+  toolbar.addView(addressHost,LinearLayout.LayoutParams(0,uiDp(36),1f).apply{setMargins(dp(4),0,dp(6),0)})
   addressField.setOnEditorActionListener{_,_,_->submitAddress();true};addressField.addTextChangedListener(watcher{if(addressEditing)showAddressSuggestions(it);updateAddressAction()})
   surfActions=row().apply{clipChildren=false;clipToPadding=false};surfScroller=HorizontalScrollView(this).apply{isHorizontalScrollBarEnabled=false;addView(surfActions)}
   surfBar=row().apply{contentDescription="Surf Bar";background=shape(theme.surface,12);setPadding(dp(8),0,dp(4),0);clipToOutline=true
    addView(surfScroller,LinearLayout.LayoutParams(0,-1,1f))
   }
-  val actionWidth=if(touchComfort)44 else 30
+  val actionWidth=30
   val groupWidth=min(12+9*actionWidth+13,(resources.configuration.screenWidthDp*.48f).toInt()).coerceAtLeast(108)
-  toolbar.addView(surfBar,LinearLayout.LayoutParams(dp(groupWidth),uiDp(if(touchComfort)48 else 36)))
+  toolbar.addView(surfBar,LinearLayout.LayoutParams(dp(groupWidth),uiDp(36)))
   fun action(name:String,label:String,run:()->Unit):View=iconButton(name,label,run).apply{
    minimumWidth=dp(actionWidth);minimumHeight=dp(32);background=null
    for(i in childCount-1 downTo 1)removeViewAt(i)
@@ -368,7 +417,7 @@ open class BrowserActivity : Activity() {
    val native=saved.native?.takeIf{it.isAttachedToWindow}?:focusNodes.firstOrNull{it.row==saved.row&&it.col==saved.col&&it.row>=0}?.view
    if(native!=null&&saved.row!=null&&(saved.row>=0||native===addressField)){chromeFocus=native===addressField;focused=native;native.requestFocus()}else content.requestFocus()
    web?.evaluateJavascript("if(window.__pocketSurf){window.__pocketSurf.mode('${pageInputMode()}');window.__pocketSurf.resumeSelection(true);}",null)
-   pointer.translationX=pointerX;pointer.translationY=pointerY
+   pointer.translationX=pointerX-pointer.hotspotX;pointer.translationY=pointerY-pointer.hotspotY
    if(mouse&&!touchMode&&tab?.home==false){pointer.visibility=View.VISIBLE;web?.let{hover.move(it,pointerX,pointerY,true)}}
   }else{content.requestFocus();web?.evaluateJavascript("window.__pocketSurf && window.__pocketSurf.resumeSelection()",null)}
   syncFocusMode();updateLegend()
@@ -392,18 +441,35 @@ open class BrowserActivity : Activity() {
  private fun saveSession(){if(isPrivateSession||isCustomTab)return;tabs.forEach{captureTab(it)};prefs.edit().putString("sessions_v2",JSONArray().apply{tabs.forEach{put(tabJson(it))}}.toString()).putInt("active",active).putString("closed_v2",JSONArray().apply{closed.forEach{put(tabJson(it))}}.toString()).putString("last_closed_batch",JSONArray().apply{lastClosedBatch.forEach{put(tabJson(it))}}.toString()).putString("last_closed_active",lastClosedActive).apply()}
  private fun restorePosition(t:Tab,v:WebView,attempt:Int=0){if(!t.restoreScroll||t.view!==v)return;v.postDelayed({if(t.restoreScroll&&t.view===v){v.scrollTo(t.scrollX,t.scrollY);if(abs(v.scrollY-t.scrollY)<=2||attempt>=7)t.restoreScroll=false else restorePosition(t,v,attempt+1)}},if(attempt==0)32 else 250)}
  private fun host(url:String)=PageIdentity.host(url)
+ private var tabChromeSignature=""
+ private fun refreshTabMetadata(){
+  for(index in 0 until tabRow.childCount){
+   val chip=tabRow.getChildAt(index) as? ViewGroup?:continue
+   val t=(chip.getTag(TAG_TAB) as? Int)?.let{tabs.getOrNull(it)}?:continue
+   chip.contentDescription="Tab ${tabs.indexOf(t)+1}: ${t.title}"
+   val line=chip.getChildAt(0) as? ViewGroup?:continue
+   (line.getChildAt(1) as? TextView)?.text=if(t.home)"New tab"else t.title
+   val url=if(t.home)"pocketsurf:new-tab"else t.url
+   val old=line.getChildAt(0)
+   if(old.getTag(TAG_ICON)!=url){val params=old.layoutParams;line.removeViewAt(0);line.addView(siteIcon(url,16),0,params)}
+  }
+  refreshSiteIcons()
+ }
  private fun updateChrome(){
   if(!::tabRow.isInitialized)return
-  if(popupLayer!=null||addressEditing){chromeDirty=true;return}
+  if(popupLayer!=null||addressEditing||searchProgress>0f){chromeDirty=true;return}
   if(previousTrigger.tag!="${bindings.label(Control.PREVIOUS_TAB)}:${theme.text}"||nextTrigger.tag!="${bindings.label(Control.NEXT_TAB)}:${theme.text}"){
    tabNavigation.removeView(previousTrigger);tabNavigation.removeView(nextTrigger);previousTrigger=tabTrigger(true);nextTrigger=tabTrigger(false);tabNavigation.addView(previousTrigger,0,margin(32,-1));tabNavigation.addView(nextTrigger,margin(32,-1))
   }
+  val signature="${tabs.map{it.id}}:$active:${tabStrip.width}:$theme"
+  if(signature==tabChromeSignature){if(screen=="page"&&focusNodes.none{it.view===addressField}){bindFocus(addressField,-2,0,{showSearch()});for(i in 0 until surfActions.childCount){val child=surfActions.getChildAt(i);bindFocus(child,-2,i+1,{activateSurfAction(child)})}};refreshTabMetadata();updateNavigationState();updateFavoritesBar();updateZoomLabel();refreshDownloadIndicator();syncFocusMode();return}
+  tabChromeSignature=signature
   val previous=focusNodes.firstOrNull{it.view===focused&&it.row<=-2}
   val oldTabBounds=(0 until tabRow.childCount).mapNotNull{val v=tabRow.getChildAt(it);val i=v.getTag(TAG_TAB) as? Int;i?.let{tabs.getOrNull(it)?.id?.let{id->id to (v.width to ((v as? ViewGroup)?.let{frame->(0 until frame.childCount).map{frame.getChildAt(it)}.filterIsInstance<ViewGroup>().flatMap{line->(0 until line.childCount).map{line.getChildAt(it)}}.firstOrNull{it.getTag(TAG_CLOSE)!=null}?.width}?:0))}}}.toMap();jumpHints.clear();focusNodes.removeAll{it.row<=-2};tabRow.removeAllViews();tabRow.setPadding(dp(4),0,dp(4),0)
   val stripWidth=if(tabStrip.width>0)(tabStrip.width/resources.displayMetrics.density).toInt()else resources.configuration.screenWidthDp-64
   val plan=SurfTabLayout.create(stripWidth-8,tabs.size,active)
   plan.indices.forEachIndexed{position,i->val t=tabs[i];val chip=FrameLayout(this).apply{contentDescription="Tab ${i+1}: ${t.title}";setTag(TAG_TAB,i);isSelected=i==active;background=shape(theme.surface,14,if(i==active)theme.accent else border());isFocusable=false;isFocusableInTouchMode=false;setOnClickListener{switchTab(i)}}
-   val line=row().apply{gravity=Gravity.CENTER_VERTICAL;setPadding(dp(8),0,dp(6),0);addView(siteIcon(t.url,16),margin(16,16,right=4));if(plan.titles)addView(text(if(t.home)"New tab"else t.title,11f,if(i==active)theme.text else theme.secondary).apply{maxLines=1;ellipsize=TextUtils.TruncateAt.END;minWidth=0},LinearLayout.LayoutParams(0,-2,1f))else addView(Space(this@BrowserActivity),LinearLayout.LayoutParams(0,1,1f))}
+   val line=row().apply{gravity=Gravity.CENTER_VERTICAL;setPadding(dp(8),0,dp(6),0);addView(siteIcon(if(t.home)"pocketsurf:new-tab"else t.url,16),margin(16,16,right=4));if(plan.titles)addView(text(if(t.home)"New tab"else t.title,11f,if(i==active)theme.text else theme.secondary).apply{maxLines=1;ellipsize=TextUtils.TruncateAt.END;minWidth=0},LinearLayout.LayoutParams(0,-2,1f))else addView(Space(this@BrowserActivity),LinearLayout.LayoutParams(0,1,1f))}
    val old=oldTabBounds[t.id];val targetClose=if(i==active)dp(28)else 0;val startClose=old?.second?:targetClose
    var closeView:View?=null
    if(i==active||startClose>0){val close=iconButton("close",if(i==active)"Close ${t.title}"else ""){if(i==active)closeTab(i,false)}.apply{minimumHeight=0;minimumWidth=0;if(i==active)setTag(TAG_CLOSE,i);isClickable=i==active;isFocusable=false;isFocusableInTouchMode=false;importantForAccessibility=if(i==active)View.IMPORTANT_FOR_ACCESSIBILITY_AUTO else View.IMPORTANT_FOR_ACCESSIBILITY_NO;(getChildAt(0) as ImageView).layoutParams=FrameLayout.LayoutParams(dp(14),dp(14),Gravity.CENTER)};closeView=close;line.addView(close,LinearLayout.LayoutParams(targetClose,dp(32)))}
@@ -427,15 +493,15 @@ open class BrowserActivity : Activity() {
  }
 
  private fun activateSurfAction(v:View){when(v.contentDescription?.toString()){
-  "Page zoom"->showPageZoom();"New tab"->newTab();"Open tabs"->showTabs();"Downloads"->showDownloads();"Share page"->tab?.takeUnless{it.home}?.let{share(it.url)};"History"->showCollection("history");"Menu"->showMenu();"Settings"->showSettings();"Close browser window"->finish();"Private session active"->showPrivateInfo();else->tab?.let{t->if(t.loadError!=null)retryPage(t)else t.view?.let{if(t.progress<100){it.stopLoading();t.progress=100;updateNavigationState()}else it.reload()}}}}
+  "Page zoom"->showPageZoom();"New tab"->newTab();"Open tabs"->showTabs();"Downloads"->showDownloads();"Share page"->tab?.takeUnless{it.home}?.let{share(it.url)};"History"->showCollection("history");"Menu"->showMenu();"Settings"->showSettingsRoot();"Close browser window"->finish();"Private session active"->showPrivateInfo();else->tab?.let{t->if(t.loadError!=null)retryPage(t)else t.view?.let{if(t.progress<100){it.stopLoading();t.progress=100;updateNavigationState()}else it.reload()}}}}
  private fun View.performClickDirect(){when(contentDescription?.toString()){ "Back"->pageBack();"Forward"->pageForward();"Open tabs"->showTabs();"Menu"->showMenu();"Go"->submitAddress();else->tab?.let{t->if(t.loadError!=null)retryPage(t)else t.view?.let{if(t.progress<100){it.stopLoading();t.progress=100;updateNavigationState()}else it.reload()}}}}
  private fun siteIcon(url:String,size:Int):View=SiteIconView.create(this,url,dp(size),Color.luminance(theme.background)<.5).apply{setTag(TAG_ICON,url);refresh(favicons.get(url))}
  private fun refreshSiteIcons(){fun refresh(v:View){if(v is SiteIconView){val url=v.getTag(TAG_ICON) as? String;if(url!=null)v.refresh(favicons.get(url));return};if(v is ViewGroup)for(i in 0 until v.childCount)refresh(v.getChildAt(i))};refresh(root)}
  private fun updateFavoritesBar(){
   focusNodes.removeAll{it.view.getTag(TAG_FAVORITE)==true||it.view.contentDescription=="All bookmarks"};favoritesRow.removeAllViews()
-  val visible=screen=="page"&&tab?.home==false&&prefs.getBoolean("favorites_bar",false)&&findBar.visibility!=View.VISIBLE;favoritesBar.visibility=if(visible)View.VISIBLE else View.GONE;if(!visible)return
+  val visible=screen=="page"&&prefs.getBoolean("favorites_bar",true);favoritesBar.visibility=if(visible)View.VISIBLE else View.GONE;if(!visible)return
   favoritesRow.setPadding(dp(8),0,dp(8),0)
-  val all=row().apply{contentDescription="All bookmarks";setPadding(dp(8),0,dp(10),0);addView(icon("bookmark",16,theme.accent),margin(16,16,right=6));addView(text("All",10f));bindFocus(this,-1,-1,{collectionQueries.remove("bookmarks");showCollection("bookmarks")})};favoritesRow.addView(all,margin(-2,28,right=8))
+  val all=row().apply{contentDescription="All bookmarks";setPadding(dp(8),0,dp(10),0);addView(icon("bookmark",16,theme.text),margin(16,16,right=6));addView(text("All",10f));bindFocus(this,-1,-1,{collectionQueries.remove("bookmarks");showCollection("bookmarks")})};favoritesRow.addView(all,margin(-2,28,right=8))
   val sites=(homeStore.shortcuts().map{it.title to it.url}+data.entries("bookmarks").map{it.title to it.url}).distinctBy{it.second}
   sites.forEachIndexed{i,(title,url)->val chip=row().apply{contentDescription="Bookmark: $title";setTag(TAG_FAVORITE,true);setPadding(dp(8),0,dp(10),0);addView(siteIcon(url,16),margin(16,16,right=6));addView(text(title,10f).apply{maxLines=1;maxWidth=dp(130);ellipsize=TextUtils.TruncateAt.END});bindFocus(this,-1,i,{openUrl(url)})};favoritesRow.addView(chip,margin(-2,28,right=5))}
 
@@ -461,16 +527,17 @@ open class BrowserActivity : Activity() {
  }
  private fun updateNavigationState(){
   val t=tab;val address=t?.takeUnless{it.home}?.url?.let{PageIdentity.label(it)}?:"Search ${engineName()} or enter address"
-  if(!addressEditing)addressText.text=(if(isPrivateSession)"Private · "else"")+address
-  backButton.isEnabled=t?.let{!it.home}==true;backButton.visibility=View.VISIBLE;backButton.alpha=if(backButton.isEnabled)1f else .32f
-  forwardButton.isEnabled=t?.let{(it.home&&it.url.isNotBlank())||it.view?.canGoForward()==true||(it.manualHistory&&it.trailIndex<it.trail.lastIndex)}==true;forwardButton.visibility=View.VISIBLE;forwardButton.alpha=if(forwardButton.isEnabled)1f else .32f
+  if(!addressEditing){val value=(if(isPrivateSession)"Private · "else"")+address;if(addressText.text.toString()!=value)addressText.text=value}
+  backButton.isEnabled=t?.let{!it.home&&(it.view?.canGoBack()==true||(it.manualHistory&&it.trailIndex>0))}==true;backButton.visibility=View.VISIBLE;backButton.alpha=if(backButton.isEnabled)1f else .32f
+  forwardButton.isEnabled=t?.let{!it.home&&(it.view?.canGoForward()==true||(it.manualHistory&&it.trailIndex<it.trail.lastIndex))}==true;forwardButton.visibility=View.VISIBLE;forwardButton.alpha=if(forwardButton.isEnabled)1f else .32f
   if(::surfActions.isInitialized)(0 until surfActions.childCount).map{surfActions.getChildAt(it)}.firstOrNull{it.contentDescription=="Share page"}?.let{it.isEnabled=t?.home==false;it.alpha=if(it.isEnabled)1f else .32f}
   val loading=t?.let{!it.home&&it.loadError==null&&it.progress<100}==true
   reloadButton.isEnabled=t?.let{!it.home&&it.view!=null}==true;reloadButton.visibility=View.VISIBLE;reloadButton.alpha=if(reloadButton.isEnabled)1f else .32f
   reloadButton.contentDescription=if(loading)"Stop loading"else if(t?.loadError!=null)"Retry page"else"Reload page";reloadButton.tooltipText=reloadButton.contentDescription
-  navigationIcon(reloadIcon,if(loading)"stop"else"reload",SurfIcon(if(loading)"stop"else"reload",theme.text));if(::pageLoadBar.isInitialized)pageLoadBar.update(t?.takeUnless{it.home||it.loadError!=null}?.id,t?.progress?:100,theme.accent,loading);updateAddressAction();updateShortcutVisibility()
+  navigationIcon(reloadIcon,if(loading)"stop"else"reload",SurfIcon(if(loading)"stop"else"reload",theme.text));if(::pageLoadBar.isInitialized)pageLoadBar.update(t?.takeUnless{it.home||it.loadError!=null}?.id,t?.progress?:100,theme.accent,loading);updateAddressAction();updateShortcutVisibility();applySearchChromeFrame()
  }
  private fun badge(action:Control,monochrome:Boolean=false,monochromeColor:Int=Color.WHITE):View {
+  if(monochrome)return ControllerBadge.create(this,bindings.label(action),monochromeColor)
   val label=bindings.label(action);if(monochrome&&label in listOf("L3","R3"))return StickBadge(this,label);val base=ControllerBindings.color(label);val color=if(monochrome)monochromeColor else if(bindings.playStation&&Color.luminance(theme.background)>.5)Color.rgb((Color.red(base)*.62f).toInt(),(Color.green(base)*.62f).toInt(),(Color.blue(base)*.62f).toInt())else base
   if(label in listOf("cross","circle","square","triangle"))return object:View(this){val p=Paint(Paint.ANTI_ALIAS_FLAG).apply {this.color=color;style=Paint.Style.STROKE;strokeWidth=2f;strokeJoin=Paint.Join.ROUND;strokeCap=Paint.Cap.ROUND};override fun onDraw(c:Canvas){super.onDraw(c);val z=min(width,height)/24f;c.save();c.translate((width-24*z)/2,(height-24*z)/2);c.scale(z,z);when(label){"cross"->{c.drawLine(7f,7f,17f,17f,p);c.drawLine(17f,7f,7f,17f,p)};"circle"->c.drawCircle(12f,12f,7f,p);"square"->c.drawRoundRect(5f,5f,19f,19f,1f,1f,p);else->{val path=Path().apply {moveTo(12f,4f);lineTo(21f,20f);lineTo(3f,20f);close()};c.drawPath(path,p)}};c.restore()}}.apply {contentDescription=label}
   return text(if(monochrome&&label=="R1")"R"else if(monochrome&&label=="L1")"L"else label,if(monochrome&&label in listOf("Start","Select"))10f else if(monochrome&&label.length>1)8f else if(label.length>2)11f else if(monochrome)10f else 12f,if(monochrome)monochromeColor else if(label in listOf("A","B","X","Y"))Color.WHITE else theme.text,true).apply {gravity=Gravity.CENTER;background=shape(if(monochrome)Color.TRANSPARENT else if(label in listOf("A","B","X","Y"))when(label){"A"->0xffb52d45.toInt();"B"->0xff826000.toInt();"X"->0xff205ea8.toInt();else->0xff13704b.toInt()} else theme.surface,if(label.length==1)20 else 5,if(monochrome)monochromeColor else if(label.length>1)theme.secondary else Color.TRANSPARENT)}
@@ -488,9 +555,11 @@ open class BrowserActivity : Activity() {
    webEditing->listOf(Control.CONFIRM to if(mouse)"Open"else"Type",Control.BACK to "Close keyboard")
    screen=="pointer_settings"->(if(focused is SeekBar)listOf(Control.LEFT to "Smaller",Control.RIGHT to "Larger")else listOf(Control.CONFIRM to "Select"))+listOf(Control.BACK to "Back")
    screen=="mouse_settings"->(if(focused is SeekBar)if(focused?.contentDescription=="Pointer size")listOf(Control.LEFT to "Smaller",Control.RIGHT to "Larger")else listOf(Control.LEFT to "Slower",Control.RIGHT to "Faster")else listOf(Control.CONFIRM to "Select"))+listOf(Control.BACK to "Back",Control.POINTER to if(mouse)"Stop test"else"Test mouse")
-    screen=="tabs"->listOf(Control.CONFIRM to if(focused?.contentDescription=="New tab")"New tab"else"Select",Control.BACK to "Back")+(if(focused?.getTag(TAG_TAB)!=null)listOf(Control.TABS to "Close")else emptyList())
-   screen=="page"->listOf(Control.CONFIRM to "Open",Control.BACK to if(tabs.isEmpty())"Exit"else if(tab?.home==true&&!surfBarActive)"Close"else"Back")+(if(tabs.isNotEmpty())listOf(Control.TABS to "Close")else emptyList())+listOf(Control.CONTEXT to "Surf Bar",Control.SEARCH to "Menu",Control.MENU to "Settings")+(if(tab?.home==false&&tab?.loadError==null)listOf(Control.POINTER to if(mouse)"Elements"else"Mouse",Control.ZOOM to "Zoom")else emptyList())
-   screen=="settings"->listOf(Control.CONFIRM to "Select",Control.BACK to "Back")+(if(settingsCategory=="mouse")listOf(Control.POINTER to if(settingsDashboard?.mouseTesting()==true)"Stop test"else"Test mouse")else emptyList())
+    screen=="tabs"->listOf(Control.CONFIRM to if(focused?.contentDescription=="New tab")"New tab"else"Select",Control.BACK to "Back")+
+     (if(focused?.getTag(TAG_TAB)!=null)listOf(Control.TABS to "Close")else emptyList())+
+     (if(tabs.isNotEmpty())listOf(Control.CONTEXT to "Close all tabs")else emptyList())
+   screen=="page"->listOf(Control.CONFIRM to "Open",Control.BACK to if(surfBarActive)"Back"else if(tabs.isEmpty())"Exit"else if(tab?.home==true)"Close"else"Back")+(if(tabs.isNotEmpty())listOf(Control.TABS to "Close")else emptyList())+listOf(Control.CONTEXT to "Surf Bar",Control.SEARCH to "Menu",Control.MENU to "Settings")+(if(tab?.home==false&&tab?.loadError==null)listOf(Control.POINTER to if(mouse)"Elements"else"Mouse",Control.ZOOM to "Zoom")else emptyList())
+   screen=="settings"->listOf(Control.CONFIRM to if(settingsDashboard?.sliderEditing()==true)"Done"else"Select",Control.BACK to "Back")+(if(settingsCategory=="mouse")listOf(Control.POINTER to if(settingsDashboard?.mouseTesting()==true)"Stop test"else"Test mouse")else emptyList())
    else->listOf(Control.CONFIRM to "Select",Control.BACK to "Back")
 
   }
@@ -532,7 +601,7 @@ open class BrowserActivity : Activity() {
  private fun focusPageNeutral(clearSelection:Boolean=false){if(screen!="page"||tab?.home!=false||addressEditing||popupLayer!=null||video!=null)return;chromeFocus=false;focused=null;addressField.showSoftInputOnFocus=false;content.requestFocus();syncFocusMode();if(clearSelection){webHasSelection=false;nativeRootScroll=true;scrollRouteKnown=true};if(clearSelection)web?.evaluateJavascript("if(window.__pocketSurf){window.__pocketSurf.clearSelection();window.__pocketSurf.mode('${pageInputMode()}');}",null)}
  private fun pointerWidth()=dp((10*prefs.getInt("pointer_size",100).coerceIn(50,220)/100f).roundToInt())
  private fun pointerHeight()=dp((14*prefs.getInt("pointer_size",100).coerceIn(50,220)/100f).roundToInt())
- private fun addPointer(){(pointer.parent as? ViewGroup)?.removeView(pointer);content.addView(pointer,FrameLayout.LayoutParams(pointerWidth(),pointerHeight()));pointer.visibility=if(mouse&&!touchMode)View.VISIBLE else View.GONE;pointer.translationX=pointerX;pointer.translationY=pointerY}
+ private fun addPointer(){(pointer.parent as? ViewGroup)?.removeView(pointer);content.addView(pointer,FrameLayout.LayoutParams(pointerWidth(),pointerHeight()));pointer.visibility=if(mouse&&!touchMode)View.VISIBLE else View.GONE;pointer.translationX=pointerX-pointer.hotspotX;pointer.translationY=pointerY-pointer.hotspotY}
  private fun showPageError(t:Tab){
   val body=column().apply{setPadding(dp(32),dp(24),dp(32),dp(24));gravity=Gravity.CENTER_VERTICAL}
   body.addView(text("Can't open this page",25f,bold=true),margin(-1,-2,bottom=12));body.addView(text(t.loadError.orEmpty(),16f,theme.secondary),margin(-1,-2,bottom=10));body.addView(text(t.url,12f,theme.secondary).apply{maxLines=2;ellipsize=TextUtils.TruncateAt.END},margin(-1,-2,bottom=20))
@@ -548,16 +617,19 @@ open class BrowserActivity : Activity() {
   shortcutUndo?.let{removed->heading.addView(actionChip("Undo unpin","undo",0,3){homeStore.put(removed);shortcutUndo=null;showPage()},margin(-2,44))};body.addView(heading,margin(-1,-2,bottom=16))
   val shortcuts=homeStore.shortcuts();val cols=if(resources.configuration.screenWidthDp>=600)3 else 2
   repeat((6+cols-1)/cols){r->val line=row().apply{gravity=Gravity.TOP};repeat(cols){c->val i=r*cols+c;val shortcut=shortcuts.getOrNull(i);val card=column().apply{gravity=Gravity.CENTER;setPadding(dp(12),dp(12),dp(12),dp(12));contentDescription=shortcut?.let{"Pinned bookmark: ${it.title}"}?:"Pin bookmark ${i+1}";if(shortcut!=null)setTag(TAG_SHORTCUT,shortcut.id)
-    if(shortcut==null)addView(icon("plus",24,theme.accent),margin(24,24,bottom=9))else addView(siteIcon(shortcut.url,30),margin(30,30,bottom=9))
+    if(shortcut==null)addView(icon("plus",24,theme.text),margin(24,24,bottom=9))else addView(siteIcon(shortcut.url,30),margin(30,30,bottom=9))
     addView(text(shortcut?.title?:"Pin bookmark",13f,if(shortcut==null)theme.secondary else theme.text,true).apply{gravity=Gravity.CENTER;maxLines=1;ellipsize=TextUtils.TruncateAt.END})
     bindFocus(this,r,c,{if(shortcut==null)showShortcutPicker()else openUrl(shortcut.url)})
     if(shortcut!=null)setOnLongClickListener{shortcutActions(shortcut,this);true}
    };line.addView(card,LinearLayout.LayoutParams(0,dp(96),1f).apply{setMargins(0,0,if(c<cols-1)dp(12)else 0,dp(12))})};body.addView(line)}
   body.addView(row().apply{gravity=Gravity.END;addView(actionChip("All bookmarks (${data.entries("bookmarks").size})","bookmark",(6+cols-1)/cols,0){collectionQueries.remove("bookmarks");showCollection("bookmarks")},margin(-2,40))},margin(-1,-2,top=4))
-  nativeScroll=ScrollView(this).apply{isFillViewport=true;addView(body)};content.addView(nativeScroll,FrameLayout.LayoutParams(-1,-1));focusFirst()
+  nativeScroll=ScrollView(this).apply{isFillViewport=true;addView(body)};content.addView(nativeScroll,FrameLayout.LayoutParams(-1,-1));syncFocusMode();focusFirst()
  }
- private fun showShortcutPicker(){val body=screen("shortcut_picker","Pin a bookmark","Frequently visited sites, or popular sites when your history is empty",{showPage()});menuGrid(body,listOf(MenuItem("plus","Enter a website","Save and pin a bookmark"){shortcutForm()})+data.entries("bookmarks").filter{v->homeStore.shortcuts().none{it.url==v.url}}.map{v->MenuItem("bookmark",v.title,host(v.url),v.url){try{homeStore.put(v.title,v.url);showPage()}catch(e:Exception){toast(e.message?:"Six bookmarks are already pinned")}}}+homeStore.suggestions(data.entries("history")).map{v->MenuItem("globe",v.title,host(v.url),v.url){try{homeStore.put(v.title,v.url);favicons.fetch(v.url){refreshSiteIcons()};showPage()}catch(e:Exception){toast(e.message?:"Could not pin bookmark")}}},3)}
- private fun shortcutForm(existing:Shortcut?=null){editingShortcut=existing;val body=screen("shortcut_form",if(existing==null)"Add website"else"Edit pinned bookmark","HTTP or HTTPS address",{showPage()});val title=searchField("Name",existing?.title.orEmpty());val url=searchField("Website address",existing?.url.orEmpty());bindFocus(title,0,0);bindFocus(url,1,0);body.addView(title,margin(-1,50,bottom=12));body.addView(url,margin(-1,50,bottom=12));body.addView(actionChip("Save","check",2,0){try{val value=StartPageStore.requireUrl(if(url.text.toString().contains("://"))url.text.toString()else"https://${url.text}");homeStore.put(title.text.toString(),value,existing?.id);hideKeyboard();favicons.fetch(value){refreshSiteIcons()};showPage()}catch(e:Exception){toast(e.message?:"Check the address")}},margin(-1,50));focusFirst()}
+ private fun showShortcutPicker(){val body=screen("shortcut_picker","Pin a bookmark","Frequently visited sites, or popular sites when your history is empty",{showPage()});menuGrid(body,listOf(MenuItem("plus","Enter a website","Save and pin a bookmark"){bookmarkForm()})+data.entries("bookmarks").filter{v->homeStore.shortcuts().none{it.url==v.url}}.map{v->MenuItem("bookmark",v.title,host(v.url),v.url){try{homeStore.put(v.title,v.url);showPage()}catch(e:Exception){toast(e.message?:"Six bookmarks are already pinned")}}}+(if(data.entries("bookmarks").isEmpty())StartPageStore.popular else homeStore.suggestions(data.entries("history"))).map{v->MenuItem("globe",v.title,host(v.url),v.url){try{homeStore.put(v.title,v.url);favicons.fetch(v.url){refreshSiteIcons()};showPage()}catch(e:Exception){toast(e.message?:"Could not pin bookmark")}}},3)}
+ private var bookmarkSaving=false
+ private var editingShortcutPin=true
+ private fun shortcutForm(existing:Shortcut?=null)=bookmarkForm(existing,editingShortcutPin)
+ private fun bookmarkForm(existing:Shortcut?=null,pin:Boolean=true){editingShortcut=existing;editingShortcutPin=pin;bookmarkSaving=false;val body=screen("shortcut_form",if(existing==null)"Add website"else"Edit pinned bookmark","HTTP or HTTPS address",{if(pin)showPage()else showCollection("bookmarks")});val title=searchField("Name",existing?.title.orEmpty());val url=searchField("Website address",existing?.url.orEmpty());bindFocus(title,0,0);bindFocus(url,1,0);body.addView(title,margin(-1,50,bottom=12));body.addView(url,margin(-1,50,bottom=12));body.addView(actionChip("Save","check",2,0){if(bookmarkSaving)return@actionChip;try{val value=StartPageStore.requireUrl(if(url.text.toString().contains("://"))url.text.toString()else"https://${url.text}");bookmarkSaving=true;toast("Looking up website icon…");hideKeyboard();favicons.fetch(value){ bookmarkSaving=false;try { if(pin)homeStore.put(title.text.toString(),value,existing?.id)else data.record(value,title.text.toString().ifBlank{host(value)},"bookmarks");refreshSiteIcons();if(screen=="shortcut_form"){if(pin)showPage()else showCollection("bookmarks")}}catch(e:Exception){toast(e.message?:"Could not save bookmark")}}}catch(e:Exception){toast(e.message?:"Check the address")}},margin(-1,50));focusFirst()}
  private fun shortcutActions(value:Shortcut,anchor:View?){openPopup("context","Menu",value.title,listOf(MenuItem("globe","Open"){openUrl(value.url)},MenuItem("settings","Edit"){shortcutForm(value)},MenuItem("back","Move left"){val i=homeStore.shortcuts().indexOfFirst{it.id==value.id};homeStore.move(value.id,i-1);showPage()},MenuItem("forward","Move right"){val i=homeStore.shortcuts().indexOfFirst{it.id==value.id};homeStore.move(value.id,i+1);showPage()},MenuItem("trash","Unpin from start"){homeStore.remove(value.id);shortcutUndo=value;showPage()}),anchor=anchor)}
 
  private fun screen(kind:String,title:String,subtitle:String="",onBack:()->Unit={showPage()},headerActions:List<Pair<String,()->Unit>> = emptyList()):LinearLayout {
@@ -605,9 +677,9 @@ open class BrowserActivity : Activity() {
 
  private fun openPopup(kind:String,title:String,subtitle:String,items:List<MenuItem>,rect:RectF?=null,anchor:View?=null){
   if(kind=="context"){showMenu(items,subtitle,rect,anchor);return}
-  interactionEpoch++;hover.leave();closePopup(false);if(addressEditing)cancelAddress(false);if(webEditing)leaveWebEditing();nativeTyping=false;imeExpected=false;hideKeyboard();stopInput();popupSavedNodes=focusNodes.toList();popupSavedFocus=focused;popupTarget=anchor;focusNodes=mutableListOf();popupKind=kind
+  interactionEpoch++;hover.leave();closePopup(false);if(addressEditing)cancelAddress(false);if(webEditing)leaveWebEditing();nativeTyping=false;imeExpected=false;hideKeyboard();stopInput();popupSavedNodes=focusNodes.toList();popupSavedFocus=focused;if(kind=="menu"){fadeNativeSelection(focused);web?.evaluateJavascript("window.__pocketSurf && window.__pocketSurf.suspendSelection(true)",null)};popupTarget=anchor;focusNodes=mutableListOf();popupKind=kind
   val host=window.decorView.findViewById<FrameLayout>(android.R.id.content);val contentXY=IntArray(2);val hostXY=IntArray(2);content.getLocationOnScreen(contentXY);host.getLocationOnScreen(hostXY)
-  val layer=FrameLayout(this).apply{contentDescription="$title popup";importantForAccessibility=View.IMPORTANT_FOR_ACCESSIBILITY_NO;if(Build.VERSION.SDK_INT>=28)accessibilityPaneTitle=title;setBackgroundColor(0x33000000);isClickable=true;setOnClickListener{closePopup()}};popupLayer=layer
+  val layer=FrameLayout(this).apply{contentDescription="$title popup";importantForAccessibility=View.IMPORTANT_FOR_ACCESSIBILITY_NO;if(Build.VERSION.SDK_INT>=28)accessibilityPaneTitle=title;setBackgroundColor(if(kind=="menu")Color.TRANSPARENT else 0x33000000);isClickable=true;setOnClickListener{closePopup()}};popupLayer=layer
   val targetRect=rect?.let{RectF(it).apply{offset((contentXY[0]-hostXY[0]).toFloat(),(contentXY[1]-hostXY[1]).toFloat())}}?:anchor?.let{val a=IntArray(2);val b=IntArray(2);it.getLocationOnScreen(a);host.getLocationOnScreen(b);RectF((a[0]-b[0]).toFloat(),(a[1]-b[1]).toFloat(),(a[0]-b[0]+it.width).toFloat(),(a[1]-b[1]+it.height).toFloat())}
   if(targetRect!=null&&targetRect.bottom>0&&targetRect.top<host.height){val highlight=View(this).apply{background=shape(Color.TRANSPARENT,5,theme.focus,3)};layer.addView(highlight,FrameLayout.LayoutParams(targetRect.width().toInt().coerceAtLeast(4),targetRect.height().toInt().coerceAtLeast(4)).apply{leftMargin=targetRect.left.toInt();topMargin=targetRect.top.toInt()})}
   fun category(item:MenuItem):String=if(kind=="menu")when(item.title){"Open tabs","New tab","Bookmarks","History","Downloads"->"Library";"Mouse mode","Element navigation"->"Privacy";else->if(item.icon in listOf("lock","shield","cookie","privacy","private"))"Privacy"else"Page"}else when{item.title in listOf("Edit","Remove","Unpin from start")||item.title.startsWith("Move ")->"Organize";item.title.startsWith("Share")||item.title.startsWith("Copy")->"Share";item.title.startsWith("Save")->"Save";item.title.contains("tab",true)->"Tabs";else->"Open"}
@@ -615,8 +687,8 @@ open class BrowserActivity : Activity() {
   val groups=(if(kind=="menu"&&menuContextItems.isNotEmpty())listOf(menuContextTitle.ifBlank{"Selected element"} to menuContextItems)else emptyList())+order.map{heading->heading to items.drop(if(kind=="menu")menuContextItems.size else 0).filter{category(it)==heading}}.filter{it.second.isNotEmpty()}
   val available=if(host.width>0)host.width else resources.displayMetrics.widthPixels
   val width=min(available-dp(24),dp(320)).coerceAtLeast(dp(240));val columns=1
-  val panel=column().apply{contentDescription="$title panel";setPadding(dp(16),dp(14),dp(16),dp(14));background=shape(theme.background,18,theme.divider);elevation=dp(16).toFloat();isClickable=true}
-  panel.addView(text(title,18f,bold=true),margin(-1,-2,bottom=4));if(subtitle.isNotBlank())panel.addView(text(subtitle,11f,theme.secondary).apply{maxLines=1;ellipsize=TextUtils.TruncateAt.END;if(kind=="zoom")zoomValue=this},margin(-1,-2,bottom=14))
+  val panel=column().apply{contentDescription="$title panel";setPadding(dp(16),dp(14),dp(16),dp(14));background=if(kind=="menu")DrawerBackground(theme.background,theme.accent,dp(18).toFloat(),dp(1).toFloat())else shape(theme.background,18,theme.divider);elevation=dp(16).toFloat();isClickable=true}
+  if(kind!="menu")panel.addView(text(title,18f,bold=true),margin(-1,-2,bottom=4));if(kind!="menu"&&subtitle.isNotBlank())panel.addView(text(subtitle,11f,theme.secondary).apply{maxLines=1;ellipsize=TextUtils.TruncateAt.END;if(kind=="zoom")zoomValue=this},margin(-1,-2,bottom=14))
   val sections=column();val stacks=(0 until columns).map{column()};val line=row().apply{gravity=Gravity.TOP};stacks.forEachIndexed{i,col->line.addView(col,LinearLayout.LayoutParams(0,-2,1f).apply{if(i<columns-1)rightMargin=dp(14)})};sections.addView(line)
   val rows=IntArray(columns)
   groups.forEachIndexed{index,(heading,actions)->val col=index%columns;val stack=stacks[col];stack.addView(text(heading,12f,theme.secondary,true),margin(-1,-2,top=if(rows[col]>0)8 else 0,bottom=6));actions.forEach{item->val r=rows[col]++;val cell=row().apply{contentDescription=item.title;minimumHeight=dp(36);setPadding(dp(10),dp(6),dp(10),dp(6));addView(icon(item.icon,18,theme.text),margin(18,18,right=10));addView(text(item.title,13f).apply{maxLines=2;ellipsize=TextUtils.TruncateAt.END},LinearLayout.LayoutParams(0,-2,1f));bindFocus(this,r,col,{closePopup();item.action()})};stack.addView(cell,margin(-1,36,bottom=4))}}
@@ -624,17 +696,29 @@ open class BrowserActivity : Activity() {
   panel.measure(View.MeasureSpec.makeMeasureSpec(width,View.MeasureSpec.EXACTLY),View.MeasureSpec.makeMeasureSpec(maxHeight,View.MeasureSpec.EXACTLY))
   val x=if(kind=="zoom")max(root.paddingLeft,available-root.paddingRight-width)else root.paddingLeft
   layer.addView(panel,FrameLayout.LayoutParams(width,if(kind=="zoom")maxHeight else -1).apply{topMargin=if(kind=="zoom")root.paddingTop+tabNavigation.height+toolbar.height else root.paddingTop;bottomMargin=root.paddingBottom+footerHeight();leftMargin=x.coerceAtLeast(root.paddingLeft)});host.addView(layer,FrameLayout.LayoutParams(-1,-1));val initial=(if(kind=="zoom")focusNodes.firstOrNull{it.view.contentDescription=="${tab?.zoomPercent}%"}else null)?.view?:focusNodes.firstOrNull()?.view;focused=initial;initial?.requestFocus();initial?.post{if(popupLayer===layer&&focused===initial)initial.requestFocus()};anchor?.foreground=shape(Color.TRANSPARENT,8,theme.focus,3);updateLegend()
-  if(kind!="zoom"&&android.animation.ValueAnimator.areAnimatorsEnabled()){panel.alpha=1f;panel.translationX=-width.toFloat();panel.animate().translationX(0f).translationY(0f).setDuration(280).setInterpolator(android.view.animation.DecelerateInterpolator()).start()}
+  if(kind=="menu"){
+   val shadow=View(this).apply{tag="menu-shadow";background=GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT,intArrayOf(0x66000000,Color.TRANSPARENT));importantForAccessibility=View.IMPORTANT_FOR_ACCESSIBILITY_NO}
+   layer.addView(shadow,FrameLayout.LayoutParams(dp(24),-1).apply{leftMargin=x+width;topMargin=root.paddingTop;bottomMargin=root.paddingBottom+footerHeight()})
+   if(android.animation.ValueAnimator.areAnimatorsEnabled()){
+    shadow.translationX=-width.toFloat();shadow.animate().translationX(0f).setDuration(220).setInterpolator(android.view.animation.PathInterpolator(.15f,0f,.85f,1f)).start()
+    layer.tag=android.animation.ValueAnimator.ofInt(0,51).apply{duration=220;interpolator=android.view.animation.LinearInterpolator();addUpdateListener{layer.setBackgroundColor((it.animatedValue as Int) shl 24)};start()}
+   }else layer.setBackgroundColor(0x33000000)
+  }
+  if(kind!="zoom"&&android.animation.ValueAnimator.areAnimatorsEnabled()){panel.alpha=1f;panel.translationX=-width.toFloat();panel.animate().translationX(0f).translationY(0f).setDuration(220).setInterpolator(android.view.animation.PathInterpolator(.15f,0f,.85f,1f)).start()}
  }
  private val closingPopups=mutableSetOf<View>()
- private fun clearClosingPopups(){closingPopups.toList().forEach{layer->(layer as? ViewGroup)?.let{for(i in 0 until it.childCount)it.getChildAt(i).animate().cancel()};layer.animate().cancel();(layer.parent as? ViewGroup)?.removeView(layer)};closingPopups.clear()}
+ private fun clearClosingPopups(){closingPopups.toList().forEach{layer->(layer as? ViewGroup)?.let{for(i in 0 until it.childCount)it.getChildAt(i).animate().cancel()};(layer.tag as? android.animation.ValueAnimator)?.cancel();layer.animate().cancel();(layer.parent as? ViewGroup)?.removeView(layer)};closingPopups.clear()}
  private fun closePopup(){closePopup(true)}
  private fun closePopup(animate:Boolean){
   zoomValue=null;zoomSlider=null;zoomStickDirection=0;nextZoomStickStep=0;if(!animate)clearClosingPopups();val layer=popupLayer?:return;val kind=popupKind;popupLayer=null;popupKind=""
-  focusNodes=popupSavedNodes.toMutableList();focused=popupSavedFocus;popupSavedNodes=emptyList();popupSavedFocus=null;popupTarget?.foreground=if(popupTarget?.parent===surfActions)null else shape(Color.TRANSPARENT,8,if(popupTarget?.isSelected==true)theme.accent else border());popupTarget=null;stopInput();if(!touchMode)focused?.requestFocus();if(chromeDirty){chromeDirty=false;updateChrome()};syncFocusMode();updateLegend()
+  if(kind=="menu"&&!surfBarActive)web?.evaluateJavascript("window.__pocketSurf && window.__pocketSurf.resumeSelection(true)",null);focusNodes=popupSavedNodes.toMutableList();focused=popupSavedFocus;popupSavedNodes=emptyList();popupSavedFocus=null;popupTarget?.foreground=if(popupTarget?.parent===surfActions)null else shape(Color.TRANSPARENT,8,if(popupTarget?.isSelected==true)theme.accent else border());popupTarget=null;stopInput();if(!touchMode)focused?.requestFocus();if(chromeDirty){chromeDirty=false;updateChrome()};syncFocusMode();updateLegend()
   val panel=allPopupPanels(layer).firstOrNull()
   if(animate&&kind=="menu"&&panel!=null&&android.animation.ValueAnimator.areAnimatorsEnabled()){
-   closingPopups.add(layer);disablePopupControls(layer);layer.setOnTouchListener{_,_->true};layer.importantForAccessibility=View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS;panel.animate().cancel();panel.alpha=1f;panel.animate().translationX(-panel.width.toFloat()).setDuration(280).setInterpolator(android.view.animation.AccelerateInterpolator()).withEndAction{(layer.parent as? ViewGroup)?.removeView(layer);closingPopups.remove(layer)}.start()
+   (layer.tag as? android.animation.ValueAnimator)?.cancel()
+   val dim=(layer.background as? android.graphics.drawable.ColorDrawable)?.color?.ushr(24)?:51
+   layer.tag=android.animation.ValueAnimator.ofInt(dim,0).apply{duration=220;interpolator=android.view.animation.LinearInterpolator();addUpdateListener{layer.setBackgroundColor((it.animatedValue as Int) shl 24)};start()}
+   layer.findViewWithTag<View>("menu-shadow")?.animate()?.translationX(-panel.width.toFloat())?.setDuration(220)?.setInterpolator(android.view.animation.PathInterpolator(.15f,0f,.85f,1f))?.start()
+   closingPopups.add(layer);disablePopupControls(layer);layer.setOnTouchListener{_,_->true};layer.importantForAccessibility=View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS;panel.animate().cancel();panel.alpha=1f;panel.animate().translationX(-panel.width.toFloat()).setDuration(220).setInterpolator(android.view.animation.PathInterpolator(.15f,0f,.85f,1f)).withEndAction{(layer.parent as? ViewGroup)?.removeView(layer);closingPopups.remove(layer)}.start()
   }else (layer.parent as? ViewGroup)?.removeView(layer)
  }
  private fun disablePopupControls(view:View){view.isEnabled=false;view.isClickable=false;view.setOnClickListener(null);if(view is ViewGroup)for(i in 0 until view.childCount)disablePopupControls(view.getChildAt(i))}
@@ -644,19 +728,21 @@ open class BrowserActivity : Activity() {
  private var settingsCategory:String?=null
  private var settingsDashboard:SettingsDashboard?=null
  private var settingsFocus:String?=null
- private fun showSettingsRoot(){showSettings()}
+ private fun showSettingsRoot(){settingsCategory="browsing";settingsFocus=null;showSettings()}
  private fun showSettingsCategory(key:String){showSettingsPanel(when(key){"controls"->"controller";"backup"->"about";else->key})}
  private fun showSettingsPanel(key:String){if(screen=="settings"&&settingsDashboard!=null){settingsCategory=key;settingsDashboard?.select(key,true)}else{settingsCategory=key;settingsFocus=null;showSettings()}}
  private fun forgetSettingsViews(parent:View){fun inside(v:View):Boolean{var n:View?=v;while(n!=null){if(n===parent)return true;n=n.parent as? View};return false};focusNodes.removeAll{inside(it.view)}}
  private fun showSettings(){
   val body=screen("settings","Settings","",{showPage()});val scroll=body.parent as View;val page=scroll.parent as LinearLayout;page.removeView(scroll);nativeScroll=null;nativeBody=null
-  val dashboard=SettingsDashboard(this,prefs,bindings,theme,{v,r,c,f,chosen->bindFocus(v,r,c,f,chosen)},{forgetSettingsViews(it)},{name,value->settingsAction(name,value)},{settingsStatus(it)},settingsCategory?:"browsing",settingsFocus,{badge(it,false)})
+  val dashboard=SettingsDashboard(this,prefs,bindings,theme,{v,r,c,f,chosen->bindFocus(v,r,c,f,chosen)},{forgetSettingsViews(it)},{name,value->settingsAction(name,value)},{settingsStatus(it)},settingsCategory?:"browsing",settingsFocus,{badge(it,true,theme.text)})
   settingsDashboard=dashboard;page.addView(dashboard,LinearLayout.LayoutParams(-1,0,1f));updateLegend()
  }
  private fun settingsStatus(name:String):String=when(name){
   "adblock"->adblock.enabled.toString();"cookies"->cookieConsent.enabled.toString();"site"->tab?.takeUnless{it.home}?.url.orEmpty();"site_cookie"->(!cookieConsent.isSiteExcluded(tab?.url.orEmpty())).toString();"filters"->adblock.status().let{"${it.supportedRules} rules · ${if(it.updating)"Updating…"else it.source}"};else->""
  }
  private fun settingsAction(name:String,value:String){when(name){
+  "slider_edit"->updateLegend()
+  "focus_header"->focusNodes.firstOrNull{it.row==-1&&it.view.contentDescription=="Back"}?.view?.requestFocus()
   "category"->{settingsCategory=value;settingsFocus="Category: $value";nativeTyping=false;imeExpected=false;hideKeyboard();sendScroll(0f,0f);updateLegend()}
   "focus"->{settingsFocus=value}
   "zoom"->changePageZoom(value.toInt())
@@ -674,10 +760,10 @@ open class BrowserActivity : Activity() {
   "site_cookie"->{val url=tab?.url.orEmpty();if((!cookieConsent.isSiteExcluded(url))!=value.toBoolean())cookieConsent.toggleSiteException(url);web?.evaluateJavascript(cookieConsent.script(url),null)}
   "filters"->{adblock.updateFilters{_,message->if(screen=="settings")settingsDashboard?.notify(message)};settingsDashboard?.notify("Updating filters…")}
   "clear_history"->{collectionUndo=null;data.write("history",emptyList())}
+  "clear_bookmarks"->{collectionUndo=null;collectionUndoPin=null;data.write("bookmarks",emptyList())}
   "clear_data"->{CookieManager.getInstance().removeAllCookies(null);WebStorage.getInstance().deleteAllData();tabs.mapNotNull{it.view}.forEach{it.clearCache(true)}}
   "Export backup"->exportBackup();"import"->importBackup()
   "Copy diagnostics"->copyDiagnostics()
-  "Run setup again"->{setupPending=true;startActivityForResult(Intent(this,SetupActivity::class.java),SETUP_REQUEST)}
   "GitHub"->openUrl("https://github.com/silasdv/PocketSurf")
   "Ko-fi"->openUrl("https://ko-fi.com/silasdv")
   "Privacy notice"->openUrl("https://github.com/silasdv/PocketSurf/blob/main/PRIVACY.md")
@@ -704,21 +790,18 @@ open class BrowserActivity : Activity() {
  private fun importBackup(){startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType("*/*"),72)}
  private fun legacyShowBookmarksBarSettings(){
   val body=screen("bookmarks_bar","Bookmarks bar","Your bookmarks below the address",{showSettings()})
-  val toggle=Switch(this).apply{contentDescription="Show bookmarks bar while browsing";text=contentDescription;textSize=15f;setTextColor(theme.text);setPadding(dp(16),dp(8),dp(16),dp(8));isChecked=prefs.getBoolean("favorites_bar",false);thumbTintList=android.content.res.ColorStateList.valueOf(theme.accent);setOnCheckedChangeListener{_,enabled->prefs.edit().putBoolean("favorites_bar",enabled).apply()};bindFocus(this,0,0)}
+  val toggle=Switch(this).apply{contentDescription="Show bookmarks bar while browsing";text=contentDescription;textSize=15f;setTextColor(theme.text);setPadding(dp(16),dp(8),dp(16),dp(8));isChecked=prefs.getBoolean("favorites_bar",true);thumbTintList=android.content.res.ColorStateList.valueOf(theme.accent);setOnCheckedChangeListener{_,enabled->prefs.edit().putBoolean("favorites_bar",enabled).apply()};bindFocus(this,0,0)}
   body.addView(toggle,margin(-1,54,bottom=16));body.addView(text("Pinned bookmarks appear first. All remaining bookmarks follow in a horizontally scrollable bar; none are hidden by a six-item limit.",14f,theme.secondary),margin(-1,-2,bottom=18))
   body.addView(actionChip("Manage bookmarks","bookmark",1,0){collectionQueries.remove("bookmarks");showCollection("bookmarks");screenBack={showBookmarksBarSettings()}},margin(260,48));focusFirst()
  }
  private fun legacyShowAppearance(){
-  val compact=resources.configuration.screenHeightDp<420;val body=screen("appearance","Appearance","",{showSettings()});val base=BrowserTheme.baseName(prefs.getString("theme","Dark")!!);val accent=prefs.getString("accent",null)?:BrowserTheme.defaultAccentName(prefs.getString("theme","Dark")!!)
+  val compact=resources.configuration.screenHeightDp<420;val body=screen("appearance","Appearance","",{showSettings()});val base=BrowserTheme.baseName(prefs.getString("theme","OLED")!!);val accent=prefs.getString("accent",null)?:BrowserTheme.defaultAccentName(prefs.getString("theme","OLED")!!)
   body.addView(text("Theme",14f,theme.secondary,true),margin(-1,-2,bottom=6));val themes=row();BrowserTheme.names.forEachIndexed{i,name->val t=BrowserTheme.resolve(name,resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK==Configuration.UI_MODE_NIGHT_YES,accent);val card=column().apply{contentDescription="$name theme";setPadding(dp(10),dp(8),dp(10),dp(8));addView(text("Aa",18f,t.text,true).apply{gravity=Gravity.CENTER;background=shape(t.background,7,t.divider)},LinearLayout.LayoutParams(-1,dp(if(compact)28 else 44)).apply{bottomMargin=dp(4)});addView(text(name,12f,theme.text,true).apply{gravity=Gravity.CENTER});bindFocus(this,0,i,{prefs.edit().putString("theme",name).putString("accent",accent).apply();applyTheme()},base==name)};themes.addView(card,LinearLayout.LayoutParams(0,uiDp(if(compact)64 else 90),1f).apply{if(i<3)rightMargin=dp(10)})};body.addView(themes)
   body.addView(text("Accent colors",14f,theme.secondary,true),margin(-1,-2,top=12,bottom=6));val colors=row();BrowserTheme.accentNames.forEachIndexed{i,name->val swatch=column().apply{contentDescription="$name accent";setPadding(dp(5),dp(6),dp(5),dp(6));addView(View(this@BrowserActivity).apply{background=shape(BrowserTheme.accentColor(name,Color.luminance(theme.background)<.5),24)},LinearLayout.LayoutParams(dp(if(compact)22 else 30),dp(if(compact)22 else 30)).apply{bottomMargin=dp(4)});addView(text(name,11f).apply{gravity=Gravity.CENTER});gravity=Gravity.CENTER;bindFocus(this,1,i,{prefs.edit().putString("accent",name).apply();applyTheme()},accent==name)};colors.addView(swatch,LinearLayout.LayoutParams(0,uiDp(if(compact)56 else 78),1f).apply{if(i<BrowserTheme.accentNames.lastIndex)rightMargin=dp(4)})};body.addView(colors);focusFirst()
  }
 
  private fun engineName()=SearchEngines.name(prefs)
  private fun choiceGrid(body:LinearLayout,items:List<MenuItem>,selectedTitle:String?=null){val cols=if(resources.configuration.screenWidthDp>=600)3 else 2;items.chunked(cols).forEachIndexed{r,group->val line=row().apply{gravity=Gravity.TOP;isBaselineAligned=false};group.forEachIndexed{c,item->val chip=row().apply{contentDescription=item.title;setPadding(dp(10),dp(6),dp(14),dp(6));addView(item.siteUrl?.let{siteIcon(it,18)}?:icon(item.icon,18),margin(18,18,right=8));addView(text(item.title,12f,bold=true).apply{maxLines=2;ellipsize=TextUtils.TruncateAt.END},LinearLayout.LayoutParams(0,-2,1f));bindFocus(this,r,c,item.action,item.title==selectedTitle)};line.addView(chip,LinearLayout.LayoutParams(0,uiDp(46),1f).apply{rightMargin=dp(8);bottomMargin=dp(8)})};repeat(cols-group.size){line.addView(Space(this),LinearLayout.LayoutParams(0,1,1f))};body.addView(line)};focusFirst()}
- private fun legacyShowEngine(){val body=screen("engine","Search engine","",{showSettings()});choiceGrid(body,SearchEngines.entries.map{e->MenuItem("search",e.name,siteUrl=e.search("")){SearchEngines.select(prefs,e);showEngine()}}+MenuItem("plus","Custom search engine"){showCustomEngine()},SearchEngines.resolve(prefs).name)}
-
- private fun legacyShowCustomEngine(){val body=screen("custom_engine","Custom search engine","Use {query} where the search text belongs",{showEngine()});val name=searchField("Name");val url=searchField("https://example.com/search?q={query}");bindFocus(name,0,0);bindFocus(url,1,0);body.addView(name,margin(-1,50,bottom=12));body.addView(url,margin(-1,50,bottom=12));body.addView(actionChip("Save","check",2,0){try{SearchEngines.select(prefs,SearchEngines.custom(name.text.toString(),url.text.toString()));hideKeyboard();showEngine()}catch(e:Exception){toast(e.message?:"Check the query URL")}},margin(-1,50));focusFirst()}
  private fun legacyShowHomeUrl(){val b=screen("home_url","Start page address","HTTP or HTTPS address",{showHomeSettings()});val field=searchField("https://example.com",homeStore.homeUrl);bindFocus(field,0,0);b.addView(field,margin(-1,50,bottom=14));b.addView(actionChip("Save","check",1,0){try{homeStore.homeUrl=if(field.text.contains("://"))field.text.toString()else"https://${field.text}";homeStore.homeMode="custom";hideKeyboard();showHomeSettings()}catch(e:Exception){toast(e.message?:"Check the address")}},margin(-1,50));focusFirst()}
  private fun legacyShowHomeSettings(){val body=screen("home_settings","Start page","",{showSettings()});choiceGrid(body,listOf(MenuItem("home","PocketSurf start page"){homeStore.homeMode="pocket";showHomeSettings()},MenuItem("globe","Blank page"){homeStore.homeMode="blank";showHomeSettings()},MenuItem("search","Custom website"){showHomeUrl()}),when(homeStore.homeMode){"custom"->"Custom website";"blank"->"Blank page";else->"PocketSurf start page"})}
 
@@ -774,13 +857,20 @@ open class BrowserActivity : Activity() {
   closePopup(false);clearClosingPopups()
   if(surfBarActive)leaveSurfBar()
   cancelAddress(false);closeFind();interactionEpoch++;hover.leave();stopInput();mouse=value;mouseHeldSeconds=0f;webHasSelection=!value;webEditing=false;nativeTyping=false;imeExpected=false;hideKeyboard();chromeFocus=false;focused=null;content.requestFocus()
-  if(value){pointerX=content.width/2f;pointerY=content.height/2f;pointer.translationX=pointerX;pointer.translationY=pointerY}
+  if(value){pointerX=content.width/2f;pointerY=content.height/2f;pointer.translationX=pointerX-pointer.hotspotX;pointer.translationY=pointerY-pointer.hotspotY}
   web?.evaluateJavascript(if(value)"if(window.__pocketSurf){window.__pocketSurf.releaseEditing();window.__pocketSurf.mode('mouse');window.__pocketSurf.clearSelection();}"else"if(window.__pocketSurf){window.__pocketSurf.releaseEditing();window.__pocketSurf.mode('controller');window.__pocketSurf.resumeSelection();window.__pocketSurf.selectAt([$pointerX,$pointerY,${content.width}]);}",null)
   pointer.visibility=if(value&&!touchMode&&tab?.home==false)View.VISIBLE else View.GONE
   if(value&&!touchMode&&tab?.home==false)web?.let{hover.move(it,pointerX,pointerY,true)}
   updateLegend()
  }
  private fun pageInputMode()=if(touchMode)"touch"else if(mouse)"mouse"else"controller"
+ /** Some fullscreen controller IMEs report only their navigation strip as IME insets.
+  * The window's visible display frame still reports the actual occluded area. */
+ private fun searchSafeBottom(inset:Int,visible:Boolean):Int {
+  if(!addressEditing||!visible||root.height<=0)return inset
+  val frame=Rect();root.getWindowVisibleDisplayFrame(frame);val location=IntArray(2);root.getLocationOnScreen(location)
+  return if(frame.bottom>frame.top)max(inset,(location[1]+root.height-frame.bottom).coerceIn(0,root.height))else inset
+ }
  private fun onImeVisibilityChanged(visible:Boolean){if(imeWasVisible&&!visible){imeExpected=false;if(addressEditing){addressKeyboardDismissed=true;nativeTyping=false;stopInput();focused=addressField;addressField.showSoftInputOnFocus=false;syncFocusMode();updateLegend()}else if(webEditing)leaveWebEditing()else if(nativeTyping){nativeTyping=false;stopInput();(root.findFocus() as? EditText)?.let{focused=it};syncFocusMode();updateLegend()}};imeWasVisible=visible}
  private fun showRemap(action:Control,listening:Boolean=false){
   remapTarget=action
@@ -845,7 +935,7 @@ open class BrowserActivity : Activity() {
  private fun legacyShowAbout(){
   val body=screen("about","About PocketSurf","${BuildConfig.VERSION_NAME} · by SilasDV · MIT",{showSettings()})
   val wide=resources.configuration.screenWidthDp/layoutScale>=520
-  val actions=listOf(MenuItem("setup","Run setup again"){setupPending=true;startActivityForResult(Intent(this,SetupActivity::class.java),SETUP_REQUEST)},MenuItem("share","Copy diagnostics"){copyDiagnostics()})
+  val actions=listOf(MenuItem("share","Copy diagnostics"){copyDiagnostics()})
   fun compact(items:List<MenuItem>,cols:Int,startRow:Int){items.chunked(cols).forEachIndexed{r,group->val line=row();group.forEachIndexed{c,item->val button=actionChip(item.title,item.icon,startRow+r,c,item.action).apply{setPadding(dp(12),dp(8),dp(12),dp(8));(getChildAt(1) as TextView).apply{textSize=13f;maxLines=2;gravity=Gravity.CENTER_VERTICAL;layoutParams=LinearLayout.LayoutParams(0,-2,1f)}};line.addView(button,LinearLayout.LayoutParams(0,dp(52),1f).apply{if(c>0)leftMargin=dp(10)})};body.addView(line,margin(-1,-2,bottom=8))}}
   compact(actions,if(wide)3 else 1,0)
 
@@ -867,19 +957,212 @@ open class BrowserActivity : Activity() {
   setSingleLine();setTextColor(theme.text);setHintTextColor(theme.secondary);textSize=16f;setPadding(dp(18),dp(10),dp(18),dp(10));background=shape(theme.surface,14,border());this.hint=hint;setText(value);imeOptions=android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH or android.view.inputmethod.EditorInfo.IME_FLAG_NO_EXTRACT_UI or android.view.inputmethod.EditorInfo.IME_FLAG_NO_FULLSCREEN;importantForAutofill=View.IMPORTANT_FOR_AUTOFILL_NO_EXCLUDE_DESCENDANTS;inputType=android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_URI
  }
  private fun showSearch(target:Tab?=tab,onReturn:(()->Unit)?=null,typed:String?=null){
-  if(addressEditing){if(addressKeyboardDismissed){addressKeyboardDismissed=false;imeExpected=true;editRequestedAt=SystemClock.uptimeMillis();addressField.showSoftInputOnFocus=true;addressField.requestFocus();getSystemService(InputMethodManager::class.java).showSoftInput(addressField,InputMethodManager.SHOW_IMPLICIT)};return}
-  if(!surfBarActive)enterSurfBar(true);interactionEpoch++;hover.leave();closePopup();stopInput();webEditing=false;addressSavedNodes=focusNodes.toList();addressSavedFocus=focused;focusNodes=focusNodes.filter{it.row<=-2}.toMutableList();searchTarget=target;searchReturn=onReturn;addressEditing=true;addressKeyboardDismissed=false;chromeFocus=true;toolbar.visibility=View.VISIBLE;tabNavigation.visibility=View.VISIBLE;updateAddressAction()
-  addressField.showSoftInputOnFocus=true;addressField.setText(typed?:target?.takeUnless{it.home}?.url.orEmpty());addressField.requestFocus();addressField.selectAll();focused=addressField;imeExpected=true;editRequestedAt=SystemClock.uptimeMillis();updateAddressAction();addressField.post{if(addressEditing){addressField.selectAll();getSystemService(InputMethodManager::class.java).showSoftInput(addressField,InputMethodManager.SHOW_IMPLICIT)}};showAddressSuggestions(addressField.text.toString());updateLegend()
+  if(addressEditing){if(typed!=null&&addressField.text.toString()!=typed){addressField.setText(typed);addressField.selectAll()};if(addressKeyboardDismissed){addressKeyboardDismissed=false;imeExpected=true;editRequestedAt=SystemClock.uptimeMillis();addressField.showSoftInputOnFocus=true;addressField.requestFocus();getSystemService(InputMethodManager::class.java).showSoftInput(addressField,InputMethodManager.SHOW_IMPLICIT)};return}
+  searchWasSurfBar=surfBarActive;if(!surfBarActive)enterSurfBar(true);interactionEpoch++;hover.leave();closePopup();stopInput();webEditing=false
+  addressSavedNodes=focusNodes.toList();addressSavedFocus=focused;focusNodes=focusNodes.filter{it.view===addressField}.toMutableList()
+  searchTarget=target;searchReturn=onReturn;addressEditing=true;addressKeyboardDismissed=false;chromeFocus=true;toolbar.visibility=View.VISIBLE;tabNavigation.visibility=View.VISIBLE
+  searchPages=emptyList();recentQueries=emptyList();searchCompletions=emptyList();searchSuggestionQuery=""
+  ensureSearchScreen();animateSearch(true);refreshSearchHistory()
+  addressField.showSoftInputOnFocus=true;addressField.setText(typed?:target?.takeUnless{it.home}?.url.orEmpty());addressField.requestFocus();addressField.selectAll();focused=addressField;imeExpected=true;editRequestedAt=SystemClock.uptimeMillis();updateAddressAction()
+  pendingAddressKeyboard=true
+  showPendingAddressKeyboard()
+  showAddressSuggestions(addressField.text.toString());updateLegend()
  }
- private fun submitAddress(){if(!addressEditing)return;val value=addressField.text.toString().trim();if(value.isBlank())return;val target=searchTarget;cancelAddress(false);target?.let{val i=tabs.indexOf(it);if(i>=0)active=i};val candidate=BrowserLogic.address(value,"pocketsurf-search:");val result=if(candidate.startsWith("pocketsurf-search:"))SearchEngines.resolve(prefs).search(value)else candidate;openUrl(result)}
- private fun cancelAddress(restore:Boolean=true){if(!addressEditing)return;addressEditing=false;addressKeyboardDismissed=false;imeExpected=false;addressField.showSoftInputOnFocus=false;hideKeyboard();suggestions?.let{content.removeView(it)};suggestions=null;focusNodes=addressSavedNodes.toMutableList();focused=addressSavedFocus;syncFocusMode();addressSavedNodes=emptyList();addressSavedFocus=null;updateAddressAction();chromeFocus=false;val returning=searchReturn;searchReturn=null;if(restore&&returning!=null)returning();if(::addressText.isInitialized)updateNavigationState();if(chromeDirty){chromeDirty=false;updateChrome()};updateLegend()}
+ private fun submitAddress(){
+  val value=addressField.text.toString().trim();if(value.isBlank()||!addressEditing)return
+  val candidate=BrowserLogic.address(value,"pocketsurf-search:")
+  if(candidate.startsWith("pocketsurf-search:"))submitSearchQuery(value)else navigateSearchPage(candidate)
+ }
+ private fun submitSearchQuery(query:String){
+  if(!addressEditing||query.isBlank())return
+  val url=SearchEngines.resolve(prefs).search(query)
+  if(!isPrivateSession)data.recordSearch(query,url)
+  navigateSearchPage(url)
+ }
+ private fun cancelAddress(restore:Boolean=true){
+  if(!addressEditing)return
+  suggestionJob?.let{handler.removeCallbacks(it)}
+  pendingAddressKeyboard=false;addressEditing=false;addressKeyboardDismissed=false;imeExpected=false;addressField.showSoftInputOnFocus=false;hideKeyboard()
+  searchEpoch++;searchHistorySession++;autocomplete.cancel();animateSearch(false)
+  focusNodes=addressSavedNodes.toMutableList();focused=addressSavedFocus;syncFocusMode();addressSavedNodes=emptyList();addressSavedFocus=null
+  updateAddressAction();chromeFocus=false;val returning=searchReturn;searchReturn=null
+  if(restore&&returning!=null)returning()else if(restore&&!searchWasSurfBar&&screen=="page")leaveSurfBar()
+  if(::addressText.isInitialized)updateNavigationState();if(chromeDirty){chromeDirty=false;updateChrome()};updateLegend()
+ }
+ private var suggestionJob:Runnable?=null
+ private var searchEpoch=0L
+ private var searchHistorySession=0L
+ private val searchWorker=java.util.concurrent.Executors.newSingleThreadExecutor {r->Thread(r,"PocketSurf search").apply{isDaemon=true}}
+ private val autocomplete=Autocomplete()
+ private var suggestionInputAt=0L
+ private var searchCompletions=emptyList<String>()
+ private var recentQueries=emptyList<String>()
+ private var searchSuggestionQuery=""
+ private var searchPages=emptyList<Visit>()
+ private var searchColumns:LinearLayout?=null
+ private var googleRows:LinearLayout?=null
+ private var websiteRows:LinearLayout?=null
+ private var searchRenderSignature=""
+ private var websiteRenderSignature=""
+ private val historyBubbles=mutableMapOf<String,HistoryBubbleView>()
+ private var searchMotion:android.animation.ValueAnimator?=null
+ private var searchProgress=0f
+ private val searchChromeSizes=mutableMapOf<View,Pair<Int,Int>>()
+ private val searchToolbarSizes=mutableMapOf<View,Pair<Int,Int>>()
+ private var searchCancel:View?=null
+
+ private fun refreshSearchHistory(){
+  if(!addressEditing)return
+  val session=++searchHistorySession
+  searchWorker.execute{
+   val history=if(isPrivateSession)emptyList()else data.entries("history")
+   val pages=SearchDestinations.rank(history)
+   val recent=if(isPrivateSession)emptyList()else data.recentSearches().map{it.title}
+   runOnUiThread{if(addressEditing&&session==searchHistorySession){searchPages=pages;recentQueries=recent;if(addressField.text.isBlank())searchCompletions=recent;renderSearchResults()}}
+  }
+ }
+ /** One attached input and one animation own every returning toolbar control. */
+ private fun ensureSearchScreen(){
+  if(suggestions==null){
+   val panel=column().apply{setPadding(dp(12),dp(4),dp(12),0);setBackgroundColor(theme.background);isClickable=true;clipChildren=true;contentDescription="Search screen"}
+   val columns=row().apply{gravity=Gravity.TOP}
+   val left=column();left.addView(text("Suggestions",12f,theme.secondary,true),margin(-1,24))
+   googleRows=column();left.addView(googleRows,LinearLayout.LayoutParams(-1,0,1f))
+   val right=column().apply{setPadding(dp(12),0,0,0)}
+   right.addView(text("Most Visited",12f,theme.secondary,true),margin(-1,24))
+   websiteRows=row().apply{gravity=Gravity.TOP};right.addView(websiteRows,margin(-1,-2))
+   columns.addView(left,LinearLayout.LayoutParams(0,-1,.55f));columns.addView(right,LinearLayout.LayoutParams(0,-1,.45f))
+   panel.addView(columns,LinearLayout.LayoutParams(-1,0,1f));searchColumns=columns
+   suggestions=panel;stage.addView(panel,FrameLayout.LayoutParams(-1,-1));panel.alpha=searchProgress
+   panel.addOnLayoutChangeListener{_,_,_,_,_,_,_,_,_->panel.post{if(addressEditing&&suggestions===panel)renderSearchResults()}}
+   searchCancel=iconButton("back","Cancel search"){cancelAddress()}.also{toolbar.addView(it,0,margin(36,36))}
+   listOf(backButton,forwardButton,surfBar).forEach{val p=it.layoutParams as LinearLayout.LayoutParams;searchToolbarSizes[it]=p.width to p.rightMargin}
+  }
+  searchCancel?.let{if(focusNodes.none{n->n.view===it})bindFocus(it,-2,-1,{cancelAddress()})}
+  if(focusNodes.none{it.view===goButton})bindFocus(goButton,-2,1,{submitAddress()})
+  applySearchChromeFrame()
+ }
+ private fun applySearchChromeFrame(){
+  if(searchToolbarSizes.isEmpty())return
+  val ready=!addressEditing&&searchProgress==0f
+  searchToolbarSizes.forEach{(v,size)->
+   val p=v.layoutParams as LinearLayout.LayoutParams
+   val width=(size.first*(1-searchProgress)).roundToInt();val margin=(size.second*(1-searchProgress)).roundToInt()
+   if(p.width!=width||p.rightMargin!=margin){p.width=width;p.rightMargin=margin;v.layoutParams=p}
+   v.visibility=View.VISIBLE
+   v.alpha=(1-searchProgress)*if(v===backButton||v===forwardButton){if(v.isEnabled)1f else .32f}else 1f
+   if(v===backButton||v===forwardButton)v.isClickable=ready
+  }
+  surfBar.descendantFocusability=if(ready)ViewGroup.FOCUS_AFTER_DESCENDANTS else ViewGroup.FOCUS_BLOCK_DESCENDANTS
+  for(i in 0 until surfActions.childCount)surfActions.getChildAt(i).isClickable=ready
+  searchCancel?.let{v->val width=(dp(36)*searchProgress).roundToInt();if(v.layoutParams.width!=width)v.layoutParams=v.layoutParams.apply{this.width=width};v.alpha=searchProgress;v.isClickable=addressEditing}
+ }
+ private fun animateSearch(open:Boolean){
+  searchMotion?.removeAllListeners();searchMotion?.cancel()
+  if(open)listOf(tabNavigation,favoritesBar,chromeGap,findBar).filter{it.visibility==View.VISIBLE}.forEach{
+   if(it !in searchChromeSizes){val p=it.layoutParams as LinearLayout.LayoutParams;val height=if(it.height>0)it.height else if(p.height>=0)p.height else{it.measure(View.MeasureSpec.makeMeasureSpec(root.width.takeIf{w->w>0}?:resources.displayMetrics.widthPixels,View.MeasureSpec.AT_MOST),View.MeasureSpec.makeMeasureSpec(0,View.MeasureSpec.UNSPECIFIED));it.measuredHeight};searchChromeSizes[it]=height to p.bottomMargin}
+  }
+  val target=if(open)1f else 0f
+  searchMotion=android.animation.ValueAnimator.ofFloat(searchProgress,target).apply{
+   duration=(260*abs(target-searchProgress)).toLong().coerceAtLeast(1);interpolator=android.view.animation.PathInterpolator(.4f,0f,.2f,1f)
+   addUpdateListener{
+    searchProgress=it.animatedValue as Float
+    searchChromeSizes.forEach{(v,size)->val p=v.layoutParams as LinearLayout.LayoutParams;p.height=(size.first*(1-searchProgress)).roundToInt();p.bottomMargin=(size.second*(1-searchProgress)).roundToInt();v.layoutParams=p;v.alpha=1-searchProgress}
+    applySearchChromeFrame();suggestions?.alpha=((searchProgress-.15f)/.85f).coerceIn(0f,1f);legendSurface.alpha=1-searchProgress
+   }
+   addListener(object:android.animation.AnimatorListenerAdapter(){
+    override fun onAnimationEnd(animation:android.animation.Animator){
+     if(!open&&!addressEditing){
+      suggestions?.let{stage.removeView(it)};suggestions=null;searchColumns=null;googleRows=null;websiteRows=null
+      searchCancel?.let{toolbar.removeView(it)};searchCancel=null;historyBubbles.clear()
+      searchChromeSizes.forEach{(v,size)->val p=v.layoutParams as LinearLayout.LayoutParams;p.height=if(v===favoritesBar)-2 else size.first;p.bottomMargin=size.second;v.layoutParams=p;v.alpha=1f};searchChromeSizes.clear()
+      applySearchChromeFrame();searchToolbarSizes.clear();legendSurface.alpha=1f;searchRenderSignature="";websiteRenderSignature=""
+      updateNavigationState();if(chromeDirty){chromeDirty=false;updateChrome()}
+     }
+    }
+   });start()
+  }
+ }
  private fun showAddressSuggestions(value:String){
-  suggestions?.let{content.removeView(it)};focusNodes.removeAll{it.row>=0};val list=column().apply{setPadding(dp(12),dp(6),dp(12),dp(6));background=shape(theme.background,12,theme.divider);elevation=dp(12).toFloat()}
-  val entries=(data.search("bookmarks",value)+data.search("history",value)).distinctBy{it.url}.take(4)
-  val choices=mutableListOf(MenuItem("search","Search ${engineName()} for “$value”"){submitAddress()});choices.addAll(entries.map{v->MenuItem("history",v.title,host(v.url),v.url){val target=searchTarget;cancelAddress(false);target?.let{val i=tabs.indexOf(it);if(i>=0)active=i};openUrl(v.url)}})
-  choices.forEachIndexed{i,item->val cell=row().apply{contentDescription=item.title+if(item.subtitle.isNotBlank())" · ${item.subtitle}"else"";setPadding(dp(10),dp(3),dp(10),dp(3));addView(icon(item.icon,18),margin(18,18,right=10));addView(column().apply{addView(text(item.title,12f).apply{maxLines=1;ellipsize=TextUtils.TruncateAt.END});if(item.subtitle.isNotBlank())addView(text(item.subtitle,10f,theme.secondary).apply{maxLines=1;ellipsize=TextUtils.TruncateAt.END})},LinearLayout.LayoutParams(0,-2,1f));bindFocus(this,i,0,item.action)};list.addView(cell,margin(-1,40))}
-  val scroll=ScrollView(this).apply{addView(list)};suggestions=scroll;val maxHeight=min(dp(210),max(dp(80),(content.height*.65f).toInt()));content.addView(scroll,FrameLayout.LayoutParams(-1,min(maxHeight,dp(choices.size*40+12)),Gravity.TOP).apply{setMargins(dp(12),dp(4),dp(12),0)})
+  if(!addressEditing)return
+  ensureSearchScreen()
+  val query=value.trim()
+  if(query==searchSuggestionQuery&&query.isNotEmpty())return
+  searchSuggestionQuery=query;val epoch=++searchEpoch;suggestionInputAt=SystemClock.elapsedRealtime()
+  suggestionJob?.let{handler.removeCallbacks(it)};autocomplete.cancel()
+  searchCompletions=if(query.isBlank())recentQueries else autocomplete.cached(query)?.items.orEmpty()
+  renderSearchResults()
+  if(query.isBlank()||autocomplete.cached(query)!=null)return
+  val inputAt=suggestionInputAt
+  val job=Runnable{
+   val scheduledAt=SystemClock.elapsedRealtime()
+   autocomplete.request(query){result->runOnUiThread{
+    if(addressEditing&&epoch==searchEpoch){
+     val dispatchAt=SystemClock.elapsedRealtime()
+     searchCompletions=result.items;renderSearchResults()
+     if(BuildConfig.DEBUG)android.util.Log.d("PocketSurfSearch","debounceMs=${scheduledAt-inputAt} networkMs=${result.networkMs} parseMs=${result.parseMs} uiQueueMs=${dispatchAt-scheduledAt-result.networkMs-result.parseMs} renderMs=${SystemClock.elapsedRealtime()-dispatchAt} totalMs=${SystemClock.elapsedRealtime()-inputAt} cached=${result.cached} rows=${result.items.size}")
+    }
+   }}
+  }
+  suggestionJob=job;handler.postDelayed(job,Autocomplete.DEBOUNCE_MS)
  }
+ private fun navigateSearchPage(url:String){
+  if(!addressEditing)return
+  val target=searchTarget;cancelAddress(false);target?.let{val i=tabs.indexOf(it);if(i>=0)active=i};openUrl(url)
+ }
+ private fun renderSearchResults(){
+  if(!addressEditing)return
+  val left=googleRows?:return;val right=websiteRows?:return;val columns=searchColumns?:return
+  var resultsChanged=false
+  val old=focused;val oldDescription=old?.contentDescription
+  val wasResult=focusNodes.any{it.row>=0&&it.view===old}
+  val rowHeight=max(dp(44),(resources.displayMetrics.scaledDensity*18+dp(20)).roundToInt())
+  val count=SearchDestinations.capacity(left.height,rowHeight)
+  val completions=searchCompletions.take(count);val recent=addressField.text.isBlank()
+  val signature="$recent:$completions:$rowHeight"
+  if(signature!=searchRenderSignature){
+   resultsChanged=true;searchRenderSignature=signature;focusNodes.removeAll{it.row>=0&&it.col==0}
+   val existing=(0 until left.childCount).map{left.getChildAt(it) as SearchSuggestionView}.associateBy{it.query}
+   for(i in left.childCount-1 downTo 0){val cell=left.getChildAt(i) as SearchSuggestionView;if(cell.query !in completions||cell.recent!=recent){cell.animate().cancel();left.removeViewAt(i)}}
+   completions.forEachIndexed{i,s->
+    val cell=existing[s]?.takeIf{it.recent==recent}?:SearchSuggestionView(this,s,theme,recent)
+    val inserted=cell.parent!==left
+    if(inserted)left.addView(cell,i.coerceAtMost(left.childCount),LinearLayout.LayoutParams(-1,rowHeight))
+    else {if(cell.layoutParams.height!=rowHeight)cell.layoutParams=LinearLayout.LayoutParams(-1,rowHeight);if(left.indexOfChild(cell)!=i){left.removeView(cell);left.addView(cell,i)}}
+    bindFocus(cell,i,0,{submitSearchQuery(s)})
+    if(inserted){cell.alpha=if(android.animation.ValueAnimator.areAnimatorsEnabled())0f else 1f;if(cell.alpha==0f)cell.animate().alpha(1f).setDuration(150).setInterpolator(android.view.animation.LinearInterpolator()).start()}
+   }
+  }
+  val rightWidth=right.width
+  val labelPaint=Paint().apply{textSize=resources.displayMetrics.scaledDensity*12}
+  val possible=SearchDestinations.capacity(rightWidth,dp(76),dp(8))
+  val labelWidth=searchPages.take(possible).maxOfOrNull{labelPaint.measureText(siteNames.name(it)).roundToInt()+dp(8)}?:0
+  val itemWidth=max(dp(76),min(dp(112),labelWidth))
+  val compact=columns.height-dp(24)<dp(56)+(resources.displayMetrics.scaledDensity*16).roundToInt()
+  val shortcutHeight=dp(if(compact)44 else 56)+(resources.displayMetrics.scaledDensity*16).roundToInt()
+  val slots=if(columns.height-dp(24)>=shortcutHeight)SearchDestinations.capacity(rightWidth,itemWidth,dp(8))else 0
+  val pages=searchPages.take(slots);val names=pages.map{siteNames.name(it)}
+  val bubbleSignature="${pages.map{it.url}}:$names:$itemWidth:$compact"
+  if(bubbleSignature!=websiteRenderSignature){
+   resultsChanged=true;websiteRenderSignature=bubbleSignature;focusNodes.removeAll{it.row>=0&&it.col>0}
+   val wanted=pages.map{it.url}.toSet()
+   for(i in right.childCount-1 downTo 0)if((right.getChildAt(i) as? HistoryBubbleView)?.destination !in wanted)right.removeViewAt(i)
+   pages.forEachIndexed{i,v->
+    val cell=historyBubbles[v.url]?:HistoryBubbleView(this,v.url,theme).also{created->
+     historyBubbles[v.url]=created
+     favicons.fetch(v.url){bitmap->if(addressEditing&&websiteRows===right&&historyBubbles[v.url]===created)created.artwork(bitmap)}
+    }
+    cell.presentation(names[i],compact)
+    val params=LinearLayout.LayoutParams(itemWidth,shortcutHeight).apply{if(i>0)leftMargin=dp(8)}
+    if(cell.parent!==right)right.addView(cell,i.coerceAtMost(right.childCount),params)else{cell.layoutParams=params;if(right.indexOfChild(cell)!=i){right.removeView(cell);right.addView(cell,i,params)}}
+    bindFocus(cell,0,i+1,{navigateSearchPage(v.url)})
+   }
+  }
+  if(wasResult&&focusNodes.none{it.view===old}){val next=focusNodes.firstOrNull{it.row>=0&&it.view.contentDescription==oldDescription}?.view?:addressField;focused=next;next.requestFocus()}
+  if(resultsChanged)syncFocusMode()
+ }
+
+
 
  private fun watcher(change:(String)->Unit)=object:TextWatcher {override fun beforeTextChanged(s:CharSequence?,start:Int,count:Int,after:Int){};override fun onTextChanged(s:CharSequence?,start:Int,before:Int,count:Int){change(s.toString())};override fun afterTextChanged(s:Editable?){} }
  private fun hideKeyboard(){getSystemService(InputMethodManager::class.java).hideSoftInputFromWindow(root.windowToken,0)}
@@ -890,26 +1173,41 @@ open class BrowserActivity : Activity() {
   collectionUndoPin?.let{pin->runCatching{homeStore.put(pin)}.onFailure{toast("Bookmark restored; unpin another bookmark to restore its start-page pin")}};collectionUndoPin=null
   collectionUndo=null;nativeFocus[key]=1 to 0;focused=null;showCollection(key)
  }
+ private var collectionRefresh:(()->Unit)?=null
  private fun showCollection(key:String){
   val title=if(key=="history")"History"else"Bookmarks"
   val actions=mutableListOf<Pair<String,()->Unit>>()
   if(collectionUndo?.first==key)actions.add("undo" to {undoCollection()})
-  actions.add("trash" to {confirm("Clear ${title.lowercase()}?","This removes all saved ${title.lowercase()} entries.",{collectionUndo=null;data.write(key,emptyList());showCollection(key)},{showCollection(key)},"Clear ${title.lowercase()}")})
+  if(key=="history")actions.add("trash" to {confirm("Clear history?","This removes visited pages and recent searches.",{collectionUndo=null;data.write(key,emptyList());showCollection(key)},{showCollection(key)},"Clear history")})
   val body=screen(key,title,if(key=="history")"Your browsing, organised by day"else"${data.entries(key).size} bookmarks · up to six pinned on your start page",{showPage()},actions)
-  val field=searchField("Search ${title.lowercase()}",collectionQueries[key].orEmpty());queryField=field;bindFocus(field,0,0);body.addView(field,margin(-1,50,bottom=12))
+  val field=searchField("Search ${title.lowercase()}",collectionQueries[key].orEmpty());queryField=field;bindFocus(field,0,0);body.addView(field,margin(-1,if(key=="bookmarks")44 else 50,bottom=if(key=="bookmarks")8 else 12))
   if(collectionUndo?.first==key)body.addView(text("Removed. Use Undo above to restore.",12f,theme.secondary),margin(-1,-2,bottom=12))
   val results=column();body.addView(results)
   fun remove(visit:Visit,index:Int){collectionQueries[key]=field.text.toString();collectionUndo=key to visit;collectionUndoPin=if(key=="bookmarks")homeStore.shortcuts().firstOrNull{it.url==visit.url}else null;data.write(key,data.entries(key).filterNot{it==visit});nativeFocus[key]=index to 0;focused=null;showCollection(key)}
   fun render(query:String){
    if(focusNodes.any{it.view===focused&&it.row>=1}){focused=field;field.requestFocus()}
-   focusNodes.removeAll{it.row>=1};results.removeAllViews();val entries=data.search(key,query);var group="";var index=1
-   if(entries.isEmpty())results.addView(emptyState(if(query.isBlank())"No ${title.lowercase()} yet"else"No matching pages",if(query.isBlank())"The pages you ${if(key=="history")"visit"else"save"} will appear here."else"Try another title or website."))
+   focusNodes.removeAll{it.row>=1};results.removeAllViews();val entries=data.search(key,query);val bookmarkCandidates=if(key=="bookmarks"&&query.isBlank())SearchDestinations.bookmarkSuggestions(data.entries(key),data.entries("history"))else emptyList();var group="";var index=1
+   if(key=="bookmarks"){
+    val controls=row();val actionRow=index++
+    controls.addView(actionChip("Enter a website","plus",actionRow,0){bookmarkForm(pin=false)},margin(-2,48))
+    val toggle=CheckBox(this).apply{contentDescription="Show bookmarks bar";isFocusable=false;minimumWidth=0;minimumHeight=0;setPadding(0,0,0,0);background=null;buttonDrawable=CheckboxIcon(theme.text,dp(18));buttonTintList=null;isChecked=prefs.getBoolean("favorites_bar",true);setOnCheckedChangeListener{_,on->prefs.edit().putBoolean("favorites_bar",on).apply()}}
+    val chip=actionChip("Show bookmarks bar","check",actionRow,1){toggle.performClick()};val iconParams=chip.getChildAt(0).layoutParams;chip.removeViewAt(0);chip.addView(toggle,0,iconParams)
+    controls.addView(chip,margin(-2,48,left=8));controls.addView(actionChip("Clear bookmarks","trash",actionRow,2){confirm("Clear bookmarks?","This removes saved bookmarks and pins. Browsing history stays.",{collectionUndo=null;collectionUndoPin=null;data.write("bookmarks",emptyList());showCollection("bookmarks")},{showCollection("bookmarks")},"Clear bookmarks")},margin(-2,48,left=8));results.addView(controls,margin(-1,48,bottom=8))
+    if(entries.isNotEmpty())results.addView(text("Saved bookmarks",12f,theme.secondary,true),margin(-1,-2,bottom=8))
+   }
+   if(entries.isEmpty()&&(key!="bookmarks"||query.isNotBlank()||bookmarkCandidates.isEmpty()))results.addView(emptyState(if(query.isBlank())"No ${title.lowercase()} yet"else"No matching pages",if(query.isBlank())"The pages you ${if(key=="history")"visit"else"save"} will appear here."else"Try another title or website."))
    entries.forEach{visit->val day=BrowserData.day(visit.time);if(key=="history"&&day!=group){group=day;results.addView(text(day.uppercase(),11f,theme.secondary,true),margin(-1,-2,top=12,bottom=10))}
     val rowIndex=index;val line=row();line.addView(tile(MenuItem(if(key=="history")"history"else"bookmark",visit.title.ifBlank{host(visit.url)},visit.url,visit.url){hideKeyboard();openUrl(visit.url)},rowIndex,0),LinearLayout.LayoutParams(0,-2,1f))
     if(key=="bookmarks"){val pin=homeStore.shortcuts().firstOrNull{it.url==visit.url};val label=if(pin!=null)"Unpin ${visit.title}"else"Pin ${visit.title}";val pinButton=actionChip(if(pin!=null)"Unpin"else"Pin","pin",rowIndex,1){try{if(pin!=null)homeStore.remove(pin.id)else homeStore.put(visit.title,visit.url);showCollection(key)}catch(_:IllegalArgumentException){toast("Six bookmarks are already pinned. Unpin one first; this bookmark remains saved.")}}.apply{contentDescription=label};line.addView(pinButton,margin(-2,48,left=8))}
     val delete=iconButton("close","Remove ${visit.title}"){remove(visit,rowIndex)};bindFocus(delete,rowIndex,if(key=="bookmarks")2 else 1,{remove(visit,rowIndex)});line.addView(delete,margin(48,48,left=10));results.addView(line,margin(-1,-2,bottom=8));index++
    }
+    if(key=="bookmarks"&&query.isBlank()&&bookmarkCandidates.isNotEmpty()){
+     results.addView(text("Suggested websites",12f,theme.secondary,true),margin(-1,-2,top=12,bottom=8))
+     val cols=if(resources.configuration.screenWidthDp>=600)4 else 2
+     bookmarkCandidates.chunked(cols).forEachIndexed{r,sites->val line=row();sites.forEachIndexed{c,v->val item=actionChip(v.title,"bookmark",index+r,c){data.record(v.url,v.title,"bookmarks");favicons.fetch(v.url){refreshSiteIcons()};showCollection(key)}.apply{setPadding(dp(8),dp(6),dp(8),dp(6));minimumHeight=dp(44);val old=getChildAt(0);val params=old.layoutParams;removeViewAt(0);addView(siteIcon(v.url,18),0,params);(getChildAt(1) as TextView).apply{textSize=12f;maxLines=1;ellipsize=TextUtils.TruncateAt.END;layoutParams=LinearLayout.LayoutParams(0,-2,1f)}};line.addView(item,LinearLayout.LayoutParams(0,dp(if(resources.configuration.screenHeightDp<400)44 else 56),1f).apply{if(c>0)leftMargin=dp(8)})};results.addView(line,margin(-1,-2,bottom=8))}
+    }
   }
+  collectionRefresh={if(screen==key){val previous=focused?.contentDescription;render(field.text.toString());focusNodes.firstOrNull{it.view.contentDescription==previous}?.view?.let{focused=it;it.requestFocus()}}}
   render(field.text.toString());field.addTextChangedListener(watcher{collectionQueries[key]=it;render(it)});field.setOnEditorActionListener{_,_,_->hideKeyboard();focusNodes.firstOrNull{it.row>0}?.view?.let{focused=it;it.requestFocus()};true};focusFirst();updateLegend()
  }
 
@@ -959,7 +1257,9 @@ open class BrowserActivity : Activity() {
   "pointer_settings"->showPointerSettings();"mouse_settings"->showMouseSettings();"bookmarks_bar"->showBookmarksBarSettings();"cookie_settings"->showCookieSettings();"private_info"->showPrivateInfo();"reading_settings"->showReadingSettings();"backup"->showBackup();"website_info"->showWebsiteInfo();"reader"->renderReader();"home_settings"->showHomeSettings();"adblock"->showAdblock();"shortcut_picker"->showShortcutPicker();"controller_buttons"->showControllerButtons(directionalMapping);"settings_category"->showSettingsCategory(settingsCategory?:"browsing");"settings"->showSettings();"appearance"->showAppearance();"controller"->showController();"history"->showCollection("history");"bookmarks"->showCollection("bookmarks");"downloads"->showDownloads();"tabs"->renderTabs();"closed"->showClosed();"menu"->{showPage();showMenu()};"engine"->showEngine();"axes"->showRightAxes();"speed"->showSpeed();"privacy"->showPrivacy();"about"->showAbout();"help"->showHelp();else->showPage()
  }}
  private fun applyTheme(){
-  val destination=screen;val oldBack=screenBack;val typed=queryField?.text?.toString();val target=searchTarget;val returning=searchReturn;val wasAddress=addressEditing;val addressDraft=if(wasAddress)addressField.text.toString()else null;if(wasAddress)cancelAddress(false)
+  refreshingAppearance=true
+  try {
+  val destination=screen;val oldBack=screenBack;val typed=queryField?.text?.toString();val target=searchTarget;val returning=searchReturn;val wasAddress=addressEditing;val addressDraft=if(wasAddress)addressField.text.toString()else null;val addressSelection=addressField.selectionStart to addressField.selectionEnd;val keyboardDismissed=addressKeyboardDismissed;if(wasAddress){cancelAddress(false);searchMotion?.end()}
   val formDrafts=if(destination in listOf("shortcut_form","home_url","custom_engine"))focusNodes.map{it.view}.filterIsInstance<EditText>().map{Triple(it.text.toString(),it.selectionStart,it.selectionEnd)}else emptyList()
   val formTyping=nativeTyping;val formFocus=focusNodes.map{it.view}.filterIsInstance<EditText>().indexOf(focused)
   theme.applyPlatform(this);hideStatusBar()
@@ -972,7 +1272,8 @@ open class BrowserActivity : Activity() {
   val newFields=focusNodes.map{it.view}.filterIsInstance<EditText>()
   formDrafts.zip(newFields).forEach{(draft,field)->field.setText(draft.first);field.setSelection(draft.second.coerceIn(0,field.length()),draft.third.coerceIn(0,field.length()))}
   if(formDrafts.isNotEmpty()&&formTyping)newFields.getOrNull(formFocus)?.let{field->focused=field;nativeTyping=true;imeExpected=true;editRequestedAt=SystemClock.uptimeMillis();field.requestFocus();getSystemService(InputMethodManager::class.java).showSoftInput(field,InputMethodManager.SHOW_IMPLICIT)}
-  updateChrome();if(wasAddress)showSearch(target,returning,addressDraft)
+  updateChrome();if(wasAddress){showSearch(target,returning,addressDraft);addressField.setSelection(addressSelection.first.coerceIn(0,addressField.length()),addressSelection.second.coerceIn(0,addressField.length()));if(keyboardDismissed){addressKeyboardDismissed=true;addressField.showSoftInputOnFocus=false;imeExpected=false;hideKeyboard()}}
+  } finally { refreshingAppearance=false }
  }
  private fun legacyShowHelp(){
   val body=screen("help","Help and controls","Quick answers for browsing on a handheld",{showSettings()})
@@ -1010,7 +1311,7 @@ open class BrowserActivity : Activity() {
    val card=column().apply {clipToOutline=true;descendantFocusability=ViewGroup.FOCUS_BLOCK_DESCENDANTS;contentDescription="${if(i==active)"Current tab: "else"Tab: "}${t.title}";setTag(TAG_TAB,i)}
    val preview=object:FrameLayout(this@BrowserActivity){override fun draw(canvas:Canvas){val saved=canvas.save();val r=dp(14).toFloat();val path=Path().apply{addRoundRect(RectF(0f,0f,width.toFloat(),height.toFloat()),floatArrayOf(r,r,r,r,0f,0f,0f,0f),Path.Direction.CW)};canvas.clipPath(path);super.draw(canvas);canvas.restoreToCount(saved)}}.apply {setBackgroundColor(theme.surface)}
    if(t.preview==null&&!isPrivateSession)t.preview=previewCache.load(t.id+"|"+if(t.home)"home"else t.url)
-   if(t.preview!=null)preview.addView(ImageView(this).apply{setImageBitmap(t.preview);scaleType=ImageView.ScaleType.FIT_CENTER},FrameLayout.LayoutParams(-1,-1))else preview.addView(column().apply {gravity=Gravity.CENTER;addView(if(t.home)icon("home",32,theme.accent)else siteIcon(t.url,32),margin(36,36,bottom=10));addView(text(if(t.home)"New tab"else"Preview available after loading",13f,theme.secondary).apply{gravity=Gravity.CENTER})},FrameLayout.LayoutParams(-1,-1))
+   if(t.preview!=null)preview.addView(ImageView(this).apply{setImageBitmap(t.preview);scaleType=ImageView.ScaleType.FIT_CENTER},FrameLayout.LayoutParams(-1,-1))else preview.addView(column().apply {gravity=Gravity.CENTER;addView(siteIcon(if(t.home)"pocketsurf:new-tab"else t.url,32),margin(36,36,bottom=10));addView(text(if(t.home)"New tab"else"Preview available after loading",13f,theme.secondary).apply{gravity=Gravity.CENTER})},FrameLayout.LayoutParams(-1,-1))
    val close=iconButton("close","Close ${t.title}"){closeTab(i,true)};close.setTag(TAG_CLOSE,i);close.isFocusable=false;close.isFocusableInTouchMode=false;(close.getChildAt(0) as ImageView).layoutParams=FrameLayout.LayoutParams(dp(14),dp(14),Gravity.CENTER);preview.addView(close,FrameLayout.LayoutParams(dp(48),dp(48),Gravity.TOP or Gravity.END).apply {setMargins(dp(8),dp(8),dp(8),dp(8))})
    val jump=jumpHint(i);preview.addView(jump,FrameLayout.LayoutParams(-2,dp(9),Gravity.BOTTOM or Gravity.END).apply{rightMargin=dp(8);bottomMargin=dp(8)});if(i==active)preview.addView(text("Current",10f,theme.accent,true).apply{contentDescription="Current tab";gravity=Gravity.CENTER;setPadding(dp(8),0,dp(8),0);background=shape(theme.surface,8)},FrameLayout.LayoutParams(-2,dp(24),Gravity.TOP or Gravity.START).apply{leftMargin=dp(10);topMargin=dp(10)});card.addView(preview,margin(-1,previewHeight))
    val footer=column().apply {setBackgroundColor(theme.surface);setPadding(dp(16),dp(13),dp(16),dp(14));addView(text(if(t.home)"New tab"else t.title,15f,bold=true).apply {maxLines=1;ellipsize=TextUtils.TruncateAt.END});addView(text(if(t.home)"PocketSurf"else t.url,11f,theme.secondary).apply {setPadding(0,dp(6),0,0);maxLines=1;ellipsize=TextUtils.TruncateAt.MIDDLE;isSelected=false;isDuplicateParentStateEnabled=false;isFocusable=false;background=null})};card.addView(footer)
@@ -1028,7 +1329,7 @@ open class BrowserActivity : Activity() {
  }
  private fun showClosed(){val body=screen("closed","Recently closed","Restore the pages you closed",{renderTabs()});if(closed.isEmpty())body.addView(emptyState("No recently closed tabs","Closed tabs from this session appear here."))else menuGrid(body,closed.reversed().map{t->MenuItem("history",t.title,host(t.url)){closed.remove(t);lastClosedBatch=lastClosedBatch.filter{it.id!=t.id};tabs.add((active+1).coerceIn(0,tabs.size),t.copy(view=null,state=null,restoreScroll=true));active=(active+1).coerceAtMost(tabs.lastIndex);showPage()}},1)}
  private fun newTab(){surfDestination=null;surfReturn=null;surfBarActive=false;capturePreview();stopInput();tabs.add((active+1).coerceIn(0,tabs.size),if(homeStore.homeMode=="custom")Tab(url=homeStore.homeUrl,title=host(homeStore.homeUrl),home=false)else Tab());active=(active+1).coerceAtMost(tabs.lastIndex);showPage();if(tab?.home==true)focusChrome();animateArrival(content)}
- private fun switchTab(index:Int){if(index !in tabs.indices)return;if(index==active&&screen=="page")return;surfDestination=null;surfReturn=null;surfBarActive=false;tab?.let{t->captureTab(t);val v=t.view;val generation=t.generation;v?.evaluateJavascript("Array.from(document.querySelectorAll('video,audio')).some(m=>!m.paused&&!m.ended)"){value->if(t.view===v&&t.generation==generation)t.mediaProtected=value=="true"}};capturePreview();stopInput();web?.evaluateJavascript("window.__pocketSurf && window.__pocketSurf.suspendSelection()",null);web?.onPause();active=index;showPage();evict()}
+ private fun switchTab(index:Int){if(index !in tabs.indices)return;if(index==active&&screen=="page")return;if(screen=="page"&&tab?.home==true&&tabs[index].home&&!addressEditing&&popupLayer==null){active=index;updateChrome();saveSession();return};surfDestination=null;surfReturn=null;surfBarActive=false;tab?.let{t->captureTab(t);val v=t.view;val generation=t.generation;v?.evaluateJavascript("Array.from(document.querySelectorAll('video,audio')).some(m=>!m.paused&&!m.ended)"){value->if(t.view===v&&t.generation==generation)t.mediaProtected=value=="true"}};capturePreview();stopInput();web?.evaluateJavascript("window.__pocketSurf && window.__pocketSurf.suspendSelection()",null);web?.onPause();active=index;showPage();evict()}
  private fun closeTab(index:Int,overview:Boolean){if(isCustomTab&&tabs.size==1&&index==0){finish();return};if(index in tabs.indices){val id=tabs[index].id;popupParents.remove(id);popupOrigins.remove(id);stopInput();destroyTab(index,overview)}}
  private fun destroyTab(index:Int,overview:Boolean){if(index !in tabs.indices)return;val old=tab;val t=tabs[index];if(t.transferActive)generatedTransfer?.close();captureTab(t);tabs.removeAt(index);lastClosedActive=old?.id.orEmpty();lastClosedBatch=listOf(t.copy(view=null,state=null,preview=null,desktopScript=null));closed.addLast(t.copy(view=null,state=null,preview=null,desktopScript=null));while(closed.size>500)closed.removeFirst();(t.view?.parent as? ViewGroup)?.removeView(t.view);t.desktopScript?.remove();t.desktopScript=null;t.view?.destroy();active=if(tabs.isEmpty())-1 else if(old===t)index.coerceAtMost(tabs.lastIndex)else tabs.indexOf(old).coerceAtLeast(0);selected=index.coerceAtMost(max(0,tabs.lastIndex));saveSession();if(overview)renderTabs(selected)else showPage()}
  private fun openUrl(url:String,new:Boolean=false){
@@ -1065,9 +1366,9 @@ open class BrowserActivity : Activity() {
 
   }
 
-  if(tabs.isEmpty()){finish();return}
-
   if(surfBarActive){leaveSurfBar();return}
+
+  if(tabs.isEmpty()){finish();return}
   if(tab?.home==true){closeTab(active,false);return}
   pageBack()
 
@@ -1109,12 +1410,24 @@ open class BrowserActivity : Activity() {
    Control.BACK->back()
    Control.CONFIRM->{if(addressEditing||screen!="page"||tab==null||tab?.home==true||tab?.loadError!=null||chromeFocus){activateNative()}else if(mouse){clickAt(pointerX,pointerY)}else activateElement()}
    Control.TABS->{if(screen=="tabs"){(focused?.getTag(TAG_TAB) as? Int)?.let{closeTab(it,true)}}else if(screen=="page"&&!addressEditing&&tabs.isNotEmpty())closeTab(active,false)}
-   Control.CONTEXT->{if(screen=="page"){if(surfBarActive)leaveSurfBar()else enterSurfBar()}}
+   Control.CONTEXT->when(screen){
+    "tabs"->closeAllTabs()
+    "page"->when {
+     surfBarActive->leaveSurfBar()
+     focused?.parent===surfActions->{
+      surfReturn=null
+      leaveSurfBar()
+      webHasSelection=false
+      web?.evaluateJavascript("window.__pocketSurf && window.__pocketSurf.clearSelection()",null)
+     }
+     else->enterSurfBar()
+    }
+   }
    Control.SEARCH->{if(screen=="page"&&!addressEditing&&!webEditing&&!nativeTyping)showMenu()}
    Control.MENU->showSettingsRoot()
 
-   Control.HISTORY_BACK->{if(screen=="page")pageBack()}
-   Control.HISTORY_FORWARD->{if(screen=="page")pageForward()}
+   Control.HISTORY_BACK->{if(screen=="page"&&backButton.isEnabled)pageBack()}
+   Control.HISTORY_FORWARD->{if(screen=="page"&&forwardButton.isEnabled)pageForward()}
    Control.PREVIOUS_TAB->tabStep(-1)
    Control.NEXT_TAB->tabStep(1)
    Control.POINTER->{if(screen=="settings"&&settingsCategory=="mouse")settingsDashboard?.toggleMouseTest()else if(screen=="mouse_settings")setPreviewMouse(!mouse)else if(screen=="page")setMouseMode(!mouse)}
@@ -1182,10 +1495,10 @@ open class BrowserActivity : Activity() {
    if(!addressTyping&&(!webEditing||mouse)&&!nativeTyping)controller.repeat(now){axisDirection(it,true)}
    val velocity=if(popupLayer==null&&!addressEditing&&!webEditing&&!nativeTyping)controller.scroll(1800f*resources.displayMetrics.density,.22f).let{v->val amount=((max(abs(controller.axes.rightX),abs(controller.axes.rightY))-.22f)/.78f).coerceIn(0f,1f);val scale=.25f+.75f*amount;v.first*scale to v.second*scale}else 0f to 0f
    if(screen=="mouse_settings"&&mouse&&!touchMode)moveMousePreview(dt)
-   if(screen=="settings"&&settingsDashboard?.mouseTesting()==true&&!touchMode){val v=controller.axes;val speed=mouseSpeed()*resources.displayMetrics.density;val delta=BrowserLogic.pointerVelocity(v.leftX,v.leftY,.22f,speed);settingsDashboard?.movePointer(delta.first*dt,delta.second*dt)}
+   if(screen=="settings"&&settingsDashboard?.mouseTesting()==true&&!touchMode){val delta=mouseVelocity(dt);settingsDashboard?.movePointer(delta.first*dt,delta.second*dt)}
    if(screen=="page"&&tab?.home==false&&tab?.loadError==null&&(!chromeFocus||surfBarActive)&&popupLayer==null&&!addressEditing&&(!webEditing||mouse)){
     var sx=velocity.first;var sy=velocity.second
-    if(mouse&&!touchMode&&!surfBarActive){val v=mouseVelocity(dt);pointerX=(pointerX+v.first*dt).coerceIn(0f,max(0f,content.width-pointer.width.toFloat()));pointerY=(pointerY+v.second*dt).coerceIn(0f,max(0f,content.height-pointer.height.toFloat()));pointer.translationX=pointerX;pointer.translationY=pointerY;web?.let{hover.move(it,pointerX,pointerY,velocity.first!=0f||velocity.second!=0f||v.first!=0f||v.second!=0f)}
+    if(mouse&&!touchMode&&!surfBarActive){val v=mouseVelocity(dt);pointerX=(pointerX+v.first*dt).coerceIn(0f,max(0f,content.width-pointer.width.toFloat()));pointerY=(pointerY+v.second*dt).coerceIn(0f,max(0f,content.height-pointer.height.toFloat()));pointer.translationX=pointerX-pointer.hotspotX;pointer.translationY=pointerY-pointer.hotspotY;web?.let{hover.move(it,pointerX,pointerY,velocity.first!=0f||velocity.second!=0f||v.first!=0f||v.second!=0f)}
      if(v.first!=0f||v.second!=0f)web?.evaluateJavascript("window.__pocketSurf && window.__pocketSurf.point([$pointerX,$pointerY,${content.width}])",null)
      val edge=dp(18);val ex=if(pointerX<edge&&v.first<0)-1f else if(pointerX>content.width-dp(10)-edge&&v.first>0)1f else 0f;val ey=if(pointerY<edge&&v.second<0)-1f else if(pointerY>content.height-dp(14)-edge&&v.second>0)1f else 0f
      if(sx==0f&&sy==0f&&(ex!=0f||ey!=0f)){val e=BrowserLogic.velocity(ex,ey,0f,1200f*resources.displayMetrics.density);sx=e.first;sy=e.second}
@@ -1209,7 +1522,15 @@ open class BrowserActivity : Activity() {
  private fun leaveWebEditing(){webEditing=false;imeExpected=false;stopInput();web?.evaluateJavascript("window.__pocketSurf && window.__pocketSurf.releaseEditing()",null)}
  private fun focusPageControls(){val first=focusNodes.firstOrNull{it.view.getTag(TAG_FAVORITE)==true};if(first!=null){chromeFocus=true;focused=first.view;first.view.requestFocus();updateLegend()}else focusChrome()}
  private fun focusChrome(){chromeFocus=true;focused=addressField;addressField.showSoftInputOnFocus=false;addressField.requestFocus();updateLegend()}
- private fun syncFocusMode(){for(n in focusNodes){n.view.isFocusableInTouchMode=n.view is EditText||!touchMode;n.view.foreground=focusOutline(n.view,n.row,!touchMode&&n.view===focused&&(n.row>-2||chromeFocus));paintActionIcon(n.view,n.row,!touchMode&&n.view===focused&&(n.row>-2||chromeFocus))}}
+ private fun syncFocusMode(){
+  for(n in focusNodes){
+   val v=n.view;v.isFocusableInTouchMode=v is EditText||!touchMode
+   if(v is HistoryBubbleView){v.update(v.hasFocus());continue}
+   if(v is SearchSuggestionView){v.update(v.hasFocus());continue}
+   val selected=!touchMode&&v===focused&&(n.row>-2||chromeFocus)
+   v.foreground=focusOutline(v,n.row,selected);paintActionIcon(v,n.row,selected);tintNativeIcons(v,selected||v.isSelected)
+  }
+ }
  private fun setInputMode(touch:Boolean,updatePage:Boolean=true){if(touchMode==touch)return;interactionEpoch++;hover.leave();stopInput();touchMode=touch;syncFocusMode();if(touch){surfBarActive=false;surfReturn=null;chromeFocus=false;web?.evaluateJavascript("window.__pocketSurf && window.__pocketSurf.resumeSelection()",null)};else if(mouse&&screen=="page"&&!addressEditing&&popupLayer==null){webEditing=false;chromeFocus=false;focused=null;content.requestFocus()};if(updatePage)web?.evaluateJavascript("window.__pocketSurf && window.__pocketSurf.mode('${pageInputMode()}')",null);if(::pointer.isInitialized)pointer.visibility=if(!touch&&mouse&&screen=="page"&&tab?.home==false)View.VISIBLE else View.GONE;updateLegend()}
 
  override fun dispatchTouchEvent(e:MotionEvent):Boolean {wakeInput();if(dismissPopupGesture){if(e.actionMasked==MotionEvent.ACTION_UP||e.actionMasked==MotionEvent.ACTION_CANCEL)dismissPopupGesture=false;return true};if(e.actionMasked==MotionEvent.ACTION_DOWN&&e.source and InputDevice.SOURCE_TOUCHSCREEN==InputDevice.SOURCE_TOUCHSCREEN){setInputMode(true)};val result=super.dispatchTouchEvent(e);if(e.actionMasked==MotionEvent.ACTION_UP){val field=root.findFocus();if(field is EditText&&field!==addressField){nativeTyping=true;imeExpected=true;editRequestedAt=SystemClock.uptimeMillis();stopInput()}};if(e.actionMasked in listOf(MotionEvent.ACTION_DOWN,MotionEvent.ACTION_MOVE,MotionEvent.ACTION_UP))lastTouchTime=SystemClock.uptimeMillis();if(e.actionMasked==MotionEvent.ACTION_UP&&screen=="page"){editRequestedAt=SystemClock.uptimeMillis();handler.postDelayed({checkWebEditing()},60)};return result}
@@ -1242,7 +1563,7 @@ open class BrowserActivity : Activity() {
    override fun onScaleChanged(v:WebView,oldScale:Float,newScale:Float){t.zoomBase=newScale}
    override fun onPageCommitVisible(v:WebView,url:String){t.previewReady=true}
    override fun onPageStarted(v:WebView,url:String,favicon:Bitmap?){t.zoomPercent=globalPageZoom();t.zoomBase=0f;customEvent(t,androidx.browser.customtabs.CustomTabsCallback.NAVIGATION_STARTED);t.generation++;t.previewReady=false;t.preview=null;t.formProtected=false;t.mediaProtected=false;if(t.transferActive)generatedTransfer?.close();if(t===tab){val held=controller.axes;val permission=pendingPermission;pendingPermission=null;if(permission!=null){prompt?.dismiss();prompt=null;permission.deny()};interactionEpoch++;hover.leave();if(t.manualHistory){if(t.historyReplay){if(t.trail.isNotEmpty())t.trail[t.trailIndex]=url}else if(t.trail.getOrNull(t.trailIndex)!=url){while(t.trail.size>t.trailIndex+1)t.trail.removeAt(t.trail.lastIndex);t.trail.add(url);t.trailIndex=t.trail.lastIndex}};webEditing=false;nativeTyping=false;webHasSelection=false;if(!addressEditing)imeExpected=false;stopInput();if(screen=="page"&&!addressEditing)controller.update(ControllerInput.Axes(rightX=held.rightX,rightY=held.rightY),SystemClock.uptimeMillis(),mouse,{},{})};val wasError=t.loadError!=null;t.url=url;t.home=false;t.loadError=null;t.progress=0;if(t===tab&&screen=="page"){if(wasError)showPage()else{if(!addressEditing&&!surfBarActive)focusPageNeutral();updateChrome()}}}
-   override fun onPageFinished(v:WebView,url:String){DesktopBrowsing.applyZoom(v,globalPageZoom());if(t.loadError==null)customEvent(t,androidx.browser.customtabs.CustomTabsCallback.NAVIGATION_FINISHED);t.previewReady=true;t.url=url;t.progress=100;t.historyReplay=false;restorePosition(t,v);if(t.loadError==null){t.title=v.title?.takeIf{it.isNotBlank()}?:host(url);inject(v);if(!isPrivateSession)data.record(url,t.title)};saveSession();if(t===tab&&screen=="page"){updateChrome()}}
+   override fun onPageFinished(v:WebView,url:String){DesktopBrowsing.applyZoom(v,globalPageZoom());if(t.loadError==null)customEvent(t,androidx.browser.customtabs.CustomTabsCallback.NAVIGATION_FINISHED);t.previewReady=true;t.url=url;t.progress=100;t.historyReplay=false;restorePosition(t,v);if(t.loadError==null){t.title=v.title?.takeIf{it.isNotBlank()}?:host(url);inject(v);if(!isPrivateSession){data.record(url,t.title);captureSiteName(t,v,url)}};saveSession();if(t===tab&&screen=="page"){updateChrome()}}
    override fun doUpdateVisitedHistory(v:WebView,url:String,isReload:Boolean){if(t.manualHistory&&t.url!=url){if(t.historyReplay){if(t.trail.isNotEmpty())t.trail[t.trailIndex]=url}else{while(t.trail.size>t.trailIndex+1)t.trail.removeAt(t.trail.lastIndex);t.trail.add(url);t.trailIndex=t.trail.lastIndex};t.url=url;t.generation++;t.formProtected=false;t.mediaProtected=false;if(t===tab){interactionEpoch++;updateNavigationState()};saveSession()}}
    override fun onReceivedSslError(v:WebView,h:SslErrorHandler,e:android.net.http.SslError){customEvent(t,androidx.browser.customtabs.CustomTabsCallback.NAVIGATION_FAILED);h.cancel();pageProblem(t,"The website certificate could not be verified. The connection was blocked to protect your data. Try again later or check the address.")}
    override fun onReceivedError(v:WebView,r:WebResourceRequest,e:WebResourceError){if(r.isForMainFrame)customEvent(t,androidx.browser.customtabs.CustomTabsCallback.NAVIGATION_FAILED);if(r.isForMainFrame)diagnosticError="WebView error ${e.errorCode}";if(r.isForMainFrame&&t.loadError==null)pageProblem(t,when(e.errorCode){WebViewClient.ERROR_HOST_LOOKUP->"The website could not be found. Check the address and your internet connection, then try again.";WebViewClient.ERROR_TIMEOUT->"The website took too long to respond. Check your connection and try again.";WebViewClient.ERROR_CONNECT->"The website could not be reached. Check your internet connection and try again.";else->"The page could not be loaded. Check the address or try again."})}
@@ -1293,6 +1614,10 @@ open class BrowserActivity : Activity() {
   val ink=if(Color.luminance(theme.accent)>.45)"#101010"else"#ffffff"
   v.evaluateJavascript("if(window.__pocketSurf)window.__pocketSurf.accent('$color');(function(){var s=document.getElementById('__pocketsurf_selection');if(!s){s=document.createElement('style');s.id='__pocketsurf_selection';(document.head||document.documentElement).appendChild(s);}s.textContent='::selection{background:$color!important;color:$ink!important;}';})();",null)
  }
+ private fun captureSiteName(t:Tab,v:WebView,url:String){
+  val generation=t.generation
+  v.evaluateJavascript(SiteNames.SCRIPT){raw->if(t.view===v&&t.generation==generation&&t.url==url){if(siteNames.remember(url,SiteNames.decode(raw))&&addressEditing)renderSearchResults()}}
+ }
  private fun inject(v:WebView){lastScroll=null;v.evaluateJavascript(assets.open("navigation.js").bufferedReader().readText(),null);selectionAccent(v);v.evaluateJavascript("window.__pocketSurf && window.__pocketSurf.mode('${pageInputMode()}')",null);v.evaluateJavascript(adblock.cosmeticScript(v.url.orEmpty()),null);v.evaluateJavascript(cookieConsent.script(v.url.orEmpty()),null);v.evaluateJavascript("document.documentElement.style.scrollPaddingBottom='${(footerHeight()/resources.displayMetrics.density).roundToInt()+12}px'",null)}
  private fun hideVideo(){val current=video?:return;val callback=videoCallback;video=null;videoCallback=null;current.keepScreenOn=false;content.removeView(current);window.setFlags(fullscreenFlags,WindowManager.LayoutParams.FLAG_FULLSCREEN);window.decorView.systemUiVisibility=fullscreenSystemUi;toolbar.visibility=if(screen=="page"||addressEditing)View.VISIBLE else View.GONE;if(::chromeGap.isInitialized)chromeGap.visibility=toolbar.visibility;tabNavigation.visibility=toolbar.visibility;updateFavoritesBar();web?.requestFocus();updateLegend();stopInput();callback?.onCustomViewHidden()}
  private fun requestHighRefreshRate(){
@@ -1304,12 +1629,25 @@ open class BrowserActivity : Activity() {
  private fun toast(message:String)=Toast.makeText(this,message,Toast.LENGTH_SHORT).show()
  override fun onPause(){customEvent(tab,androidx.browser.customtabs.CustomTabsCallback.TAB_HIDDEN);interactionEpoch++;hover.leave();resumed=false;Choreographer.getInstance().removeFrameCallback(frame);frameScheduled=false;handler.removeCallbacks(maintenance);stopInput();capturePreview();saveSession();web?.onPause();super.onPause()}
  override fun onResume(){super.onResume();customEvent(tab,androidx.browser.customtabs.CustomTabsCallback.TAB_SHOWN);resumed=true;lastFrame=0;stopInput();requestHighRefreshRate();Choreographer.getInstance().removeFrameCallback(frame);frameScheduled=false;lastInputTime=SystemClock.uptimeMillis();scheduleFrame();handler.removeCallbacks(maintenance);handler.postDelayed(maintenance,750);if(screen=="page"){web?.onResume();updateChrome()};if(!isPrivateSession)handler.postDelayed({(application as? SurfApplication)?.cleanupAbandonedPrivate()},750)}
- override fun onDestroy(){if(previewCacheHolder.isInitialized())previewCache.close();generatedTransfer?.close();pendingPermission?.deny();pendingPermission=null;Choreographer.getInstance().removeFrameCallback(frame);hideVideo();favicons.close();adblock.close();getSystemService(android.hardware.input.InputManager::class.java).unregisterInputDeviceListener(deviceListener);handler.removeCallbacksAndMessages(null);closePopup(false);clearClosingPopups();prompt?.dismiss();tabs.forEach{it.desktopScript?.remove();it.desktopScript=null;it.view?.destroy()};fileCallback?.onReceiveValue(null);super.onDestroy();if(isPrivateSession&&(application as? SurfApplication)?.privateProcess==true&&isFinishing&&!isChangingConfigurations)handler.postDelayed({android.os.Process.killProcess(android.os.Process.myPid())},150)}
- override fun onWindowFocusChanged(hasFocus:Boolean){super.onWindowFocusChanged(hasFocus);if(!hasFocus)stopInput()else hideStatusBar()}
+ override fun onDestroy(){prefs.unregisterOnSharedPreferenceChangeListener(dataChanges);addressEditing=false;searchEpoch++;searchHistorySession++;searchMotion?.removeAllListeners();searchMotion?.cancel();autocomplete.clear();searchWorker.shutdownNow();if(previewCacheHolder.isInitialized())previewCache.close();generatedTransfer?.close();pendingPermission?.deny();pendingPermission=null;Choreographer.getInstance().removeFrameCallback(frame);hideVideo();favicons.close();adblock.close();getSystemService(android.hardware.input.InputManager::class.java).unregisterInputDeviceListener(deviceListener);handler.removeCallbacksAndMessages(null);closePopup(false);clearClosingPopups();prompt?.dismiss();tabs.forEach{it.desktopScript?.remove();it.desktopScript=null;it.view?.destroy()};fileCallback?.onReceiveValue(null);super.onDestroy();if(isPrivateSession&&(application as? SurfApplication)?.privateProcess==true&&isFinishing&&!isChangingConfigurations)handler.postDelayed({android.os.Process.killProcess(android.os.Process.myPid())},150)}
+ private var pendingAddressKeyboard=false
+ private fun showPendingAddressKeyboard(){
+  if(!pendingAddressKeyboard || !hasWindowFocus())return
+  addressField.post {
+   if(pendingAddressKeyboard && hasWindowFocus()){
+    pendingAddressKeyboard=false
+    if(addressEditing && !addressKeyboardDismissed && imeExpected && addressField.requestFocus()){
+     if(Build.VERSION.SDK_INT>=30)addressField.windowInsetsController?.show(WindowInsets.Type.ime())
+     else getSystemService(InputMethodManager::class.java).showSoftInput(addressField,0)
+    }
+   }
+  }
+ }
+ override fun onWindowFocusChanged(hasFocus:Boolean){super.onWindowFocusChanged(hasFocus);if(!hasFocus)stopInput()else {hideStatusBar();showPendingAddressKeyboard()}}
  private fun hideStatusBar(){window.addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);if(Build.VERSION.SDK_INT>=30){window.decorView.windowInsetsController?.hide(WindowInsets.Type.statusBars());window.decorView.windowInsetsController?.systemBarsBehavior=WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE}}
  override fun onSaveInstanceState(out:Bundle){if(isCustomTab){tabs.forEach{captureTab(it)};out.putString("custom_tabs",JSONArray().apply{tabs.forEach{put(tabJson(it))}}.toString());out.putInt("custom_active",active);out.putString("custom_owner",customOwner)};saveSession();out.putString("settings_category",settingsCategory);out.putString("settings_focus",settingsFocus);out.putString("surf_destination",surfDestination);out.putString("destination",screen);super.onSaveInstanceState(out)}
  override fun onConfigurationChanged(c:Configuration){super.onConfigurationChanged(c);requestHighRefreshRate();saveSession();applyTheme()}
- override fun onNewIntent(i:Intent){super.onNewIntent(i);setIntent(i);if(i.action==Intent.ACTION_MAIN&&i.data==null){newTab();return};i.data?.let{if(it.scheme in listOf("http","https"))openUrl(it.toString(),true)}}
- override fun onActivityResult(request:Int,result:Int,data:Intent?){super.onActivityResult(request,result,data);if(request==SETUP_REQUEST){setupPending=false;homeStore.shortcuts().forEach{favicons.fetch(it.url){refreshSiteIcons()}};val draft=if(addressEditing)addressField.text.toString()else null;if(screen=="page")showPage()else if(screen=="settings")showSettings()else if(screen=="about")showAbout();if(draft!=null)showSearch(typed=draft)}else if(request==71){if(result==RESULT_OK)data?.data?.let{uri->try{contentResolver.openOutputStream(uri,"wt")?.use{it.write(BackupCodec.export(prefs).toByteArray(Charsets.UTF_8))}?:error("Cannot write file");toast("Backup exported")}catch(_:Exception){toast("Backup could not be written")}}}else if(request==72){if(result==RESULT_OK)data?.data?.let{uri->val epoch=interactionEpoch;Thread({try{val bytes=contentResolver.openInputStream(uri)?.use{input->val out=java.io.ByteArrayOutputStream();val buf=ByteArray(8192);while(true){val n=input.read(buf);if(n<0)break;require(out.size()+n<=BackupCodec.MAX_BYTES);out.write(buf,0,n)};out.toByteArray()}?:error("Cannot read file");val values=BackupCodec.validate(bytes.toString(Charsets.UTF_8));runOnUiThread{if(!isFinishing&&epoch==interactionEpoch)confirm("Import backup?",BackupCodec.summary(values)+". Matching saved settings and lists will be replaced.",{BackupCodec.apply(prefs,values);showSettings();applyTheme();toast("Backup restored")},{showBackup()},"Import")}}catch(_:Exception){runOnUiThread{toast("Invalid or unreadable backup; no settings changed")}}},"PocketSurf backup").start()}}else if(request==74){val pending=pendingGenerated;pendingGenerated=null;if(result==RESULT_OK&&pending!=null)data?.data?.let{uri->if(tab!==pending.lease.target||web!==pending.lease.view||pending.lease.generation!=pending.lease.target.generation||screen!="page"){toast("Source page changed; generated download cancelled");return@let};if((data.flags and Intent.FLAG_GRANT_READ_URI_PERMISSION)!=0)runCatching{contentResolver.takePersistableUriPermission(uri,Intent.FLAG_GRANT_READ_URI_PERMISSION)};generatedTransfer?.close();val t=pending.lease.target;t.transferActive=true;generatedTransfer=GeneratedFileTransfer(this,pending.lease.view,pending.url,uri,pending.name,pending.mime,downloads,{!isFinishing&&tabs.contains(t)&&t.view===pending.lease.view&&t.generation==pending.lease.generation},{message->t.transferActive=false;toast(message);if(screen=="downloads")nativeBody?.let{renderDownloads(it)}}).also{it.start()}}}else if(request==7){val p=fileLease;fileCallback?.onReceiveValue(if(p!=null&&tab===p.target&&web===p.view&&p.target.generation==p.generation&&screen=="page")WebChromeClient.FileChooserParams.parseResult(result,data)else null);fileCallback=null;fileLease=null}else if(request==8&&screen=="about")showAbout()}
- companion object {private const val SETUP_REQUEST=41;private const val GOOGLE="https://www.google.com/search?q=";private const val TAG_TAB=0x7f0f0101;private const val TAG_DOWNLOAD=0x7f0f0102;private const val TAG_SHORTCUT=0x7f0f0103;private const val TAG_ICON=0x7f0f0104;private const val TAG_FAVORITE=0x7f0f0105;private const val TAG_FIND=0x7f0f0106;private const val TAG_CLOSE=0x7f0f0107;private const val TAG_HINT=0x7f0f0108;private const val TAG_HINT_ACTION=0x7f0f0109;private val REMAPPABLE=(19..23).toSet()+(96..110).toSet()+(188..203).toSet()}
+ override fun onNewIntent(i:Intent){super.onNewIntent(i);setIntent(i);if(i.action==Intent.ACTION_MAIN&&i.data==null){newTab();showSearch();return};i.data?.let{if(it.scheme in listOf("http","https"))openUrl(it.toString(),true)}}
+ override fun onActivityResult(request:Int,result:Int,data:Intent?){super.onActivityResult(request,result,data);if(request==71){if(result==RESULT_OK)data?.data?.let{uri->try{contentResolver.openOutputStream(uri,"wt")?.use{it.write(BackupCodec.export(prefs).toByteArray(Charsets.UTF_8))}?:error("Cannot write file");toast("Backup exported")}catch(_:Exception){toast("Backup could not be written")}}}else if(request==72){if(result==RESULT_OK)data?.data?.let{uri->val epoch=interactionEpoch;Thread({try{val bytes=contentResolver.openInputStream(uri)?.use{input->val out=java.io.ByteArrayOutputStream();val buf=ByteArray(8192);while(true){val n=input.read(buf);if(n<0)break;require(out.size()+n<=BackupCodec.MAX_BYTES);out.write(buf,0,n)};out.toByteArray()}?:error("Cannot read file");val values=BackupCodec.validate(bytes.toString(Charsets.UTF_8));runOnUiThread{if(!isFinishing&&epoch==interactionEpoch)confirm("Import backup?",BackupCodec.summary(values)+". Matching saved settings and lists will be replaced.",{BackupCodec.apply(prefs,values);showSettings();applyTheme();toast("Backup restored")},{showBackup()},"Import")}}catch(_:Exception){runOnUiThread{toast("Invalid or unreadable backup; no settings changed")}}},"PocketSurf backup").start()}}else if(request==74){val pending=pendingGenerated;pendingGenerated=null;if(result==RESULT_OK&&pending!=null)data?.data?.let{uri->if(tab!==pending.lease.target||web!==pending.lease.view||pending.lease.generation!=pending.lease.target.generation||screen!="page"){toast("Source page changed; generated download cancelled");return@let};if((data.flags and Intent.FLAG_GRANT_READ_URI_PERMISSION)!=0)runCatching{contentResolver.takePersistableUriPermission(uri,Intent.FLAG_GRANT_READ_URI_PERMISSION)};generatedTransfer?.close();val t=pending.lease.target;t.transferActive=true;generatedTransfer=GeneratedFileTransfer(this,pending.lease.view,pending.url,uri,pending.name,pending.mime,downloads,{!isFinishing&&tabs.contains(t)&&t.view===pending.lease.view&&t.generation==pending.lease.generation},{message->t.transferActive=false;toast(message);if(screen=="downloads")nativeBody?.let{renderDownloads(it)}}).also{it.start()}}}else if(request==7){val p=fileLease;fileCallback?.onReceiveValue(if(p!=null&&tab===p.target&&web===p.view&&p.target.generation==p.generation&&screen=="page")WebChromeClient.FileChooserParams.parseResult(result,data)else null);fileCallback=null;fileLease=null}else if(request==8&&screen=="about")showAbout()}
+ companion object {private const val GOOGLE="https://www.google.com/search?q=";private const val TAG_TAB=0x7f0f0101;private const val TAG_DOWNLOAD=0x7f0f0102;private const val TAG_SHORTCUT=0x7f0f0103;private const val TAG_ICON=0x7f0f0104;private const val TAG_FAVORITE=0x7f0f0105;private const val TAG_FIND=0x7f0f0106;private const val TAG_CLOSE=0x7f0f0107;private const val TAG_HINT=0x7f0f0108;private const val TAG_HINT_ACTION=0x7f0f0109;private val REMAPPABLE=(19..23).toSet()+(96..110).toSet()+(188..203).toSet()}
 }

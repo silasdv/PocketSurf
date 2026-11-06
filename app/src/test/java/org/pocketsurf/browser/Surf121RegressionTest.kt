@@ -24,7 +24,7 @@ import java.time.Duration
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class Surf121RegressionTest {
  private val prefs get()=RuntimeEnvironment.getApplication().getSharedPreferences("browser",0)
- @Before fun reset(){prefs.edit().clear().putBoolean(SetupActivity.COMPLETE,true).commit();RecordingWebViewShadow.clearEvidence()}
+ @Before fun reset(){prefs.edit().clear().putBoolean("setup_complete",true).commit();RecordingWebViewShadow.clearEvidence()}
  private fun all(v:View):List<View> = listOf(v)+if(v is ViewGroup)(0 until v.childCount).flatMap{all(v.getChildAt(it))}else emptyList()
  private fun views(a:BrowserActivity)=all(a.window.decorView)
  private fun field(a:Any,n:String):Any?=a.javaClass.getDeclaredField(n).apply{isAccessible=true}.get(a)
@@ -41,7 +41,7 @@ class Surf121RegressionTest {
  private fun texts(v:View)=all(v).filterIsInstance<TextView>().map{it.text.toString()}
 
  private fun launchIntent()=android.content.Intent(android.content.Intent.ACTION_MAIN).addCategory(android.content.Intent.CATEGORY_LAUNCHER)
- @Test fun launcherCreatesOneReadyNewTabOnFirstStart(){val c=Robolectric.buildActivity(BrowserActivity::class.java,launchIntent()).setup().visible();val a=c.get();settle(a);assertEquals(1,count(a));assertEquals(true,field(call(a,"getTab")!!,"home"));assertFalse(field(a,"addressEditing") as Boolean);assertEquals(field(a,"addressField"),field(a,"focused"));c.pause().stop().destroy()}
+ @Test fun launcherCreatesOneReadyNewTabOnFirstStart(){val c=Robolectric.buildActivity(BrowserActivity::class.java,launchIntent()).setup().visible();val a=c.get();settle(a);assertEquals(1,count(a));assertEquals(true,field(call(a,"getTab")!!,"home"));assertTrue(field(a,"addressEditing") as Boolean);assertEquals(field(a,"addressField"),field(a,"focused"));c.pause().stop().destroy()}
  @Test fun launcherPreservesExistingSessionAndSelectsFreshTab(){val seed=start(2);seed.pause().stop().destroy();val c=Robolectric.buildActivity(BrowserActivity::class.java,launchIntent()).setup().visible();val a=c.get();settle(a);assertEquals(3,count(a));val tabs=field(a,"tabs") as List<*>;assertEquals(2,tabs.count{field(it!!,"home")==false});assertEquals(true,field(call(a,"getTab")!!,"home"));val state=android.os.Bundle();c.saveInstanceState(state).pause().stop().destroy();val restored=Robolectric.buildActivity(BrowserActivity::class.java,launchIntent()).create(state).start().resume().visible();settle(restored.get());assertEquals(3,count(restored.get()));restored.pause().stop().destroy()}
  @Test fun returningThroughLauncherCreatesNewTabButExternalLinkDoesNotAddExtraBlank(){val c=start(1);val a=c.get();c.newIntent(launchIntent());settle(a);assertEquals(2,count(a));assertEquals(true,field(call(a,"getTab")!!,"home"));val link=android.content.Intent(android.content.Intent.ACTION_VIEW,Uri.parse("https://target.test/"));c.newIntent(link);settle(a);assertEquals(3,count(a));assertEquals("https://target.test/",field(call(a,"getTab")!!,"url"));c.pause().stop().destroy()}
  @Test fun coldExternalLinkCreatesOnlyItsWebsiteTab(){val i=android.content.Intent(android.content.Intent.ACTION_VIEW,Uri.parse("https://target.test/"));val c=Robolectric.buildActivity(BrowserActivity::class.java,i).setup().visible();val a=c.get();settle(a);assertEquals(1,count(a));assertEquals(false,field(call(a,"getTab")!!,"home"));c.pause().stop().destroy()}

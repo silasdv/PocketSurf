@@ -12,25 +12,13 @@ data class SearchEngine(val id:String,val name:String,val template:String) {
 
 /** Query templates do not make any request until the user submits a search. */
 object SearchEngines {
- val entries=listOf(
-  SearchEngine("google","Google","https://www.google.com/search?q={query}"),
-  SearchEngine("bing","Bing","https://www.bing.com/search?q={query}"),
-  SearchEngine("duckduckgo","DuckDuckGo","https://duckduckgo.com/?q={query}"),
-  SearchEngine("brave","Brave Search","https://search.brave.com/search?q={query}"),
-  SearchEngine("ecosia","Ecosia","https://www.ecosia.org/search?q={query}"),
-  SearchEngine("startpage","Startpage","https://www.startpage.com/sp/search?query={query}"),
-  SearchEngine("yahoo","Yahoo","https://search.yahoo.com/search?p={query}"),
-  SearchEngine("wikipedia","Wikipedia","https://en.wikipedia.org/w/index.php?search={query}")
- )
+ val entries=listOf(SearchEngine("google","Google","https://www.google.com/search?q={query}"))
  val default:SearchEngine get()=entries.first()
  fun find(value:String?):SearchEngine?=entries.firstOrNull{it.id==value||it.name.equals(value,true)||it.template==value||it.prefix==value}
  fun resolve(prefs:SharedPreferences):SearchEngine {
   val value=prefs.getString("search_template",null)?:prefs.getString("search",null)
-  find(value)?.let{return it}
-  if(!value.isNullOrBlank()){
-   val template=if(value.contains("{query}"))value else "$value{query}"
-   if(validateTemplate(template))return SearchEngine("custom",prefs.getString("search_name","Custom search").orEmpty().trim().take(60).ifBlank{"Custom search"},template)
-  }
+  if(value!=default.template||prefs.getString("search",null)!=default.prefix||prefs.getString("search_name",null)!=default.name)
+   prefs.edit().putString("search_template",default.template).putString("search",default.prefix).putString("search_name",default.name).apply()
   return default
  }
  fun select(prefs:SharedPreferences,engine:SearchEngine){require(validateTemplate(engine.template)){"Use an HTTP(S) address with one {query} placeholder"};prefs.edit().putString("search_template",engine.template).putString("search",engine.prefix).putString("search_name",engine.name).apply()}

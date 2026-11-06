@@ -1,0 +1,4 @@
+Arrow geometry from https://github.com/lucide-icons/lucide/blob/main/icons/arrow-big-up.svg (ISC)
+Controller geometry from https://github.com/Templarian/MaterialDesign-SVG/blob/master/svg/controller-classic-outline.svg (Apache-2.0)
+PlayStation geometry from https://github.com/simple-icons/simple-icons/blob/develop/icons/playstation.svg (CC0-1.0)
+SVG paths converted to Android Canvas paths, recolored to match the current theme. Arrow rotated for each direction.

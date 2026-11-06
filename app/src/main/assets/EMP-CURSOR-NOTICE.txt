@@ -1,0 +1,1 @@
+Metal-hand cursor: supplied by Silas as their own artwork for PocketSurf on 2026-11-04. Replaces the earlier third-party EMP asset.

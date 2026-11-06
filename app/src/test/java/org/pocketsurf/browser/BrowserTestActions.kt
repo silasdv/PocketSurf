@@ -16,7 +16,7 @@ internal object BrowserTestActions {
   if(field(a,"screen")=="settings"){
    val category=when(label){"Appearance","Theme and accent","Reading and accessibility","Website text size"->"appearance";"Controller","Action buttons","Directional buttons"->"controller";"Mouse","Mouse Appearance"->"mouse";"Search engine","Start page","Bookmarks bar","Default browser"->"browsing";"Adblock","Cookie consent","Privacy and browsing data","Browsing data"->"privacy";"Backup and restore","About PocketSurf","Help and controls"->"about";else->null}
    if(category!=null){views(a.window.decorView).first{it.contentDescription=="Category: $category"}.performClick();settle(a);if(label=="Default browser")click(a,label);return true}
-   val target=when{label=="SNES labels"->"Labels: PlayStation";label=="PlayStation labels"->"Labels: SNES";label in BrowserTheme.names->"Theme: $label";label.endsWith(" theme")->"Theme: ${label.removeSuffix(" theme")}";label.endsWith(" accent")->"Accent: ${label.removeSuffix(" accent")}";label=="Swap buttons"->"Confirm setting action";label=="Choose from list"->"Choose physical button";else->null}
+   val target=when{label=="SNES labels"->"Labels: PlayStation";label=="PlayStation labels"->"Labels: Nintendo layout";label in BrowserTheme.names->"Theme: $label";label.endsWith(" theme")->"Theme: ${label.removeSuffix(" theme")}";label.endsWith(" accent")->"Accent: ${label.removeSuffix(" accent")}";label=="Swap buttons"->"Confirm setting action";label=="Choose from list"->"Choose physical button";else->null}
    if(target!=null){click(a,target);return true}
   }
   val aliases=mapOf("Appearance" to "Theme and accent","Reading and accessibility" to "Website text size","Privacy and browsing data" to "Browsing data")

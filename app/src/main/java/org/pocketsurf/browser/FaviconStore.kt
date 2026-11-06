@@ -70,8 +70,27 @@ class FaviconStore(context:Context):AutoCloseable {
  private fun deliver(callback:(Bitmap?)->Unit,bitmap:Bitmap?){main.post{if(!closed)callback(bitmap)}}
  private fun submit(task:()->Unit):Boolean {if(closed)return false;return try{worker.execute{if(!closed)task()};true}catch(_:RejectedExecutionException){false}}
  private fun file(key:String)=File(folder,MessageDigest.getInstance("SHA-256").digest(key.toByteArray(Charsets.UTF_8)).joinToString(""){"%02x".format(it)}+".png")
+ private fun java.io.InputStream.takeBounded(limit:Int):ByteArray {val out=ByteArrayOutputStream();val buffer=ByteArray(4096);while(out.size()<limit){val n=read(buffer,0,minOf(buffer.size,limit-out.size()));if(n<0)break;out.write(buffer,0,n)};return out.toByteArray()}
  private fun download(url:String):Bitmap? {
-  val target=fetchUrl(url)?:return null
+  val fallback=fetchUrl(url)?:return null
+  // Read the site's own declared icon before trying the conventional favicon path.
+  val declared=try {
+   val page=URI(url);val target=URI("https",null,page.host,if(page.scheme=="https")page.port else -1,page.path.ifBlank{"/"},page.query,null)
+   val c=target.toURL().openConnection() as HttpsURLConnection;connection=c
+   c.connectTimeout=2500;c.readTimeout=2500;c.instanceFollowRedirects=false
+   if(c.responseCode==200&&c.contentType.orEmpty().contains("text/html")){
+    val html=c.inputStream.use{String(it.takeBounded(128*1024),Charsets.UTF_8)}
+    Regex("<link\\b[^>]*>",RegexOption.IGNORE_CASE).findAll(html).mapNotNull{m->
+     fun attr(name:String)=Regex(name+"\\s*=\\s*[\"']([^\"']+)[\"']",RegexOption.IGNORE_CASE).find(m.value)?.groupValues?.get(1)
+     val rel=attr("rel").orEmpty();val href=attr("href")
+     if(!rel.contains("icon",true)||href==null)null else runCatching{target.resolve(href)}.getOrNull()?.takeIf{it.scheme=="https"&&it.host==target.host}?.toString()
+    }.toList()
+   }else emptyList()
+  }catch(_:Exception){emptyList<String>()}finally{connection?.disconnect();connection=null}
+  for(target in (declared+fallback).distinct().take(5)){downloadImage(target)?.let{return it}}
+  return null
+ }
+ private fun downloadImage(target:String):Bitmap? {
   return try {
    val c=URI(target).toURL().openConnection() as HttpsURLConnection;connection=c
    c.connectTimeout=3500;c.readTimeout=3500;c.instanceFollowRedirects=false;c.setRequestProperty("Accept","image/*")

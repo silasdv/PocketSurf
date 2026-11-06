@@ -14,7 +14,21 @@ class BrowserData(private val prefs:SharedPreferences){
   val old=entries(key);if(key=="history"&&old.firstOrNull()?.let {it.url==url&&time-it.time<30_000}==true)return
   write(key,(listOf(Visit(url,title,time))+if(key=="bookmarks")old.filter {it.url!=url}else old).take(if(key=="history")2000 else 500))
  }
- fun write(key:String,items:List<Visit>){val a=JSONArray();items.forEach {a.put(JSONObject().put("url",it.url).put("title",it.title).put("time",it.time))};val edit=prefs.edit().putString(key,a.toString());if(key=="bookmarks")runCatching{val pins=JSONArray(prefs.getString("home_shortcuts","[]"));val kept=JSONArray();for(i in 0 until pins.length()){val pin=pins.getJSONObject(i);if(items.any{it.url==pin.optString("url")})kept.put(pin)};edit.putString("home_shortcuts",kept.toString())};edit.apply()}
+ fun write(key:String,items:List<Visit>){val a=JSONArray();items.forEach {a.put(JSONObject().put("url",it.url).put("title",it.title).put("time",it.time))};val edit=prefs.edit().putString(key,a.toString());if(key=="history"){
+  val removed=entries("history").filterNot{it in items}.map{searchDestination(it.url)}.toSet()-items.map{searchDestination(it.url)}.toSet()
+  val searches=if(items.isEmpty())emptyList()else entries("search_queries").filterNot{searchDestination(it.url) in removed}
+  val queries=JSONArray();searches.forEach{queries.put(JSONObject().put("url",it.url).put("title",it.title).put("time",it.time))};edit.putString("search_queries",queries.toString())
+ };if(key=="bookmarks")runCatching{val pins=JSONArray(prefs.getString("home_shortcuts","[]"));val kept=JSONArray();for(i in 0 until pins.length()){val pin=pins.getJSONObject(i);if(items.any{it.url==pin.optString("url")})kept.put(pin)};edit.putString("home_shortcuts",kept.toString())};edit.apply()}
+ /** Intentional searches only. Visited URLs are never reverse-engineered into recent queries. */
+ fun recordSearch(query:String,url:String,time:Long=System.currentTimeMillis()){
+  val text=query.filterNot{it.isISOControl()}.trim().take(1024);if(text.isBlank())return
+  write("search_queries",(listOf(Visit(url,text,time))+entries("search_queries").filterNot{it.title.equals(text,true)}).take(200))
+ }
+ fun recentSearches()=entries("search_queries").sortedByDescending{it.time}.distinctBy{it.title.lowercase(java.util.Locale.ROOT)}
+ private fun searchDestination(url:String):String=runCatching{
+  val u=java.net.URI(url);val q=u.rawQuery.orEmpty().split('&').firstOrNull{it.substringBefore('=')=="q"}?.substringAfter('=',"")
+  if(q==null)SearchDestinations.identity(url)else SearchDestinations.websiteKey(url)+u.path+"?q="+java.net.URLDecoder.decode(q,"UTF-8")
+ }.getOrDefault(url)
  fun search(key:String,query:String)=entries(key).filter {it.title.contains(query,true)||it.url.contains(query,true)}.let {if(key=="history")it.sortedByDescending{v->v.time}else it}
  companion object {
   fun day(time:Long,now:Long=System.currentTimeMillis(),zone:ZoneId=ZoneId.systemDefault()):String {

@@ -18,7 +18,7 @@ import java.time.Duration
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class CompactSettingsRegressionTest {
  private val app get()=RuntimeEnvironment.getApplication()
- @Before fun reset(){app.getSharedPreferences("browser",0).edit().clear().putBoolean(SetupActivity.COMPLETE,true).commit()}
+ @Before fun reset(){app.getSharedPreferences("browser",0).edit().clear().putBoolean("setup_complete",true).commit()}
  private fun field(a:BrowserActivity,n:String)=BrowserActivity::class.java.getDeclaredField(n).apply{isAccessible=true}.get(a)
  private fun call(a:BrowserActivity,n:String,vararg args:Any?)=BrowserActivity::class.java.declaredMethods.first{it.name==n&&it.parameterCount==args.size}.apply{isAccessible=true}.invoke(a,*args)
  private fun views(v:View):List<View> = listOf(v)+if(v is ViewGroup)(0 until v.childCount).flatMap{views(v.getChildAt(it))}else emptyList()
@@ -27,7 +27,7 @@ class CompactSettingsRegressionTest {
  private fun shot(a:BrowserActivity,name:String){val v=a.window.decorView;val b=android.graphics.Bitmap.createBitmap(v.width,v.height,android.graphics.Bitmap.Config.ARGB_8888);v.draw(android.graphics.Canvas(b));java.io.File("build/reports/compact-settings/$name-${v.width}.png").apply{parentFile.mkdirs();outputStream().use{b.compress(android.graphics.Bitmap.CompressFormat.PNG,100,it)}};b.recycle()}
  @Test fun addressUsesPaperPlaneWithoutSelectHint(){val c=start();val a=c.get();call(a,"focusChrome");settle(a);val host=field(a,"addressHost") as View;assertTrue(views(host).none{it.contentDescription=="Shortcut: Select"});call(a,"showSearch",null,null,"example.com");settle(a);val send=field(a,"goButton") as View;assertTrue(send.isEnabled);send.performClick();settle(a);assertEquals(false,field(a,"addressEditing"));assertEquals("https://example.com",(call(a,"getTab") as BrowserActivity.Tab).url);assertFalse(send.isEnabled);shot(a,"address");c.pause().stop().destroy()}
  @Test fun mouseSwitchesHaveBalancedInsets(){val c=start();val a=c.get();val u=DashboardChecks;u.open(a,"mouse");val toggle=u.node(a,"Mouse acceleration");assertEquals(toggle.paddingLeft,toggle.paddingRight);assertTrue(toggle.paddingLeft>0);u.fits(a);shot(a,"mouse");c.pause().stop().destroy()}
- private fun aboutFits(){val c=start();val a=c.get();val u=DashboardChecks;u.open(a,"about");u.fits(a);val actions=listOf("GitHub","Ko-fi","Run setup again").map{u.node(a,it)};assertSame(actions[0].parent,actions[1].parent);assertEquals(actions[0].height,actions[2].height);shot(a,"about");c.pause().stop().destroy()}
+ private fun aboutFits(){val c=start();val a=c.get();val u=DashboardChecks;u.open(a,"about");u.fits(a);val actions=listOf("GitHub","Ko-fi","Help and controls").map{u.node(a,it)};assertSame(actions[0].parent,actions[1].parent);assertEquals(actions[0].height,actions[2].height);shot(a,"about");c.pause().stop().destroy()}
  @Test fun aboutFitsHandheldLandscape(){aboutFits()}
  @Test @Config(qualifiers="w640dp-h360dp-land-mdpi") fun aboutFitsCompactLandscape(){aboutFits()}
 }

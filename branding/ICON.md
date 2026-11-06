@@ -1,5 +1,5 @@
 # PocketSurf icon
 
-Selected concept C: an uppercase P with an S-shaped negative-space channel. Original concepts were generated with the built-in image_gen tool; the selected direction is implemented as a two-color vector for crisp rendering at every density.
+The blue SVG supplied by Silas is preserved in `pocketsurf-app-icon.svg`. Its radial gradient and path geometry are used by the Android adaptive launcher foreground. The launcher has a neutral #F7FAFF background and a 66 dp artwork area inside the 108 dp adaptive canvas.
 
-The adaptive foreground and Android 13 monochrome layer share the same white silhouette. The solid background is #005DFF. The launcher foreground reserves mask-safe space. branding/pocketsurf-mark.svg is the matching README/brand asset.
+The supplied solid SVG is preserved in `pocketsurf-mark.svg`. Its geometry replaces the settings gear in the interface and appears in About. Interface tint follows the current theme and focus state. Android 13 themed icons use the same silhouette in the monochrome layer.

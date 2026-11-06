@@ -18,14 +18,36 @@ import java.time.Duration
 @Config(sdk=[33],qualifiers="w960dp-h540dp-land-mdpi",shadows=[RecordingWebViewShadow::class])
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class SurfBarRegressionTest {
+ @Test fun identicalHomeTabsKeepTheSamePinnedViewAndFocus() {
+  val c=start(false);val a=c.get()
+  call(a,"newTab");settle(a)
+  val pin=all(a.window.decorView).first{it.contentDescription=="Pin bookmark 1"}
+  pin.requestFocus();settle(a)
+  call(a,"switchTab",0);settle(a)
+  assertSame(pin,all(a.window.decorView).first{it.contentDescription=="Pin bookmark 1"})
+  assertSame(pin,a.window.decorView.findFocus())
+  c.pause().stop().destroy()
+ }
+ @Test fun yLeavesAnActionFocusedWithoutTheYEntryState() {
+  val c=start(false);val a=c.get()
+  val actions=get(a,"surfActions") as ViewGroup
+  put(a,"chromeFocus",true)
+  val action=(0 until actions.childCount).map(actions::getChildAt).first{it.contentDescription=="New tab"}
+  action.requestFocus();put(a,"focused",action);put(a,"surfBarActive",false)
+  key(a,KeyEvent.KEYCODE_BUTTON_Y)
+  assertEquals(false,get(a,"surfBarActive"))
+  assertNull(focused(a))
+  assertFalse(a.isFinishing)
+  c.pause().stop().destroy()
+ }
  private val app get()=RuntimeEnvironment.getApplication()
- @Before fun reset(){app.getSharedPreferences("browser",0).edit().clear().putBoolean(SetupActivity.COMPLETE,true).commit();RecordingWebViewShadow.clearEvidence()}
+ @Before fun reset(){app.getSharedPreferences("browser",0).edit().clear().putBoolean("setup_complete",true).commit();RecordingWebViewShadow.clearEvidence()}
  private fun get(a:BrowserActivity,n:String)=BrowserActivity::class.java.getDeclaredField(n).apply{isAccessible=true}.get(a)
  private fun put(a:BrowserActivity,n:String,v:Any?){BrowserActivity::class.java.getDeclaredField(n).apply{isAccessible=true}.set(a,v)}
  private fun call(a:BrowserActivity,n:String,vararg args:Any?)=BrowserActivity::class.java.declaredMethods.first{it.name==n&&it.parameterCount==args.size}.apply{isAccessible=true}.invoke(a,*args)
  private fun all(v:View):List<View> = listOf(v)+if(v is ViewGroup)(0 until v.childCount).flatMap{all(v.getChildAt(it))}else emptyList()
  private fun settle(a:BrowserActivity){repeat(3){a.window.decorView.apply{measure(View.MeasureSpec.makeMeasureSpec(a.resources.configuration.screenWidthDp,View.MeasureSpec.EXACTLY),View.MeasureSpec.makeMeasureSpec(a.resources.configuration.screenHeightDp,View.MeasureSpec.EXACTLY));layout(0,0,measuredWidth,measuredHeight)};TestFrameClock.advance(Duration.ofMillis(120))}}
- private fun start(page:Boolean=true)=Robolectric.buildActivity(BrowserActivity::class.java,if(page)Intent(Intent.ACTION_VIEW,Uri.parse("https://fixture.test/"))else Intent(Intent.ACTION_MAIN)).setup().visible().also{settle(it.get())}
+ private fun start(page:Boolean=true)=Robolectric.buildActivity(BrowserActivity::class.java,if(page)Intent(Intent.ACTION_VIEW,Uri.parse("https://fixture.test/"))else Intent(Intent.ACTION_MAIN)).setup().visible().also{if(!page){call(it.get(),"cancelAddress",false);call(it.get(),"leaveSurfBar")};settle(it.get())}
  private fun key(a:BrowserActivity,k:Int){a.dispatchKeyEvent(KeyEvent(0,k));a.dispatchKeyEvent(KeyEvent(1,k));settle(a)}
  private fun tabCount(a:BrowserActivity)=(get(a,"tabs") as List<*>).size
  private fun focused(a:BrowserActivity)=get(a,"focused") as? View

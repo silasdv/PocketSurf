@@ -24,7 +24,7 @@ import java.time.Duration
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class Surf118RegressionTest {
  private val prefs get()=RuntimeEnvironment.getApplication().getSharedPreferences("browser",0)
- @Before fun reset(){prefs.edit().clear().putBoolean(SetupActivity.COMPLETE,true).commit();RecordingWebViewShadow.clearEvidence()}
+ @Before fun reset(){prefs.edit().clear().putBoolean("setup_complete",true).commit();RecordingWebViewShadow.clearEvidence()}
  private fun all(v:View):List<View> = listOf(v)+if(v is ViewGroup)(0 until v.childCount).flatMap{all(v.getChildAt(it))}else emptyList()
  private fun views(a:BrowserActivity)=all(a.window.decorView)
  private fun field(a:Any,n:String):Any?=a.javaClass.getDeclaredField(n).apply{isAccessible=true}.get(a)
@@ -40,7 +40,7 @@ class Surf118RegressionTest {
  private fun count(a:BrowserActivity)=(field(a,"tabs") as List<*>).size
  private fun texts(v:View)=all(v).filterIsInstance<TextView>().map{it.text.toString()}
 
- @Test fun addressHasNoSelectHintAndHistoryKeepsDimIcons(){val c=start();val a=c.get();assertTrue(all(field(a,"addressHost") as View).none{it.tag==0x7f0f0108});BrowserTestActions.newTab(a);for(name in listOf("Back","Forward")){val button=views(a).first{it.contentDescription==name};assertTrue(button.isShown);assertFalse(button.isEnabled);assertTrue(button.alpha<.5f);assertTrue(all(button).filter{it.tag==0x7f0f0108}.none{it.isShown})};shot(a,"dim-history-no-hints");c.pause().stop().destroy()}
+ @Test fun addressHasNoSelectHintAndHistoryKeepsDimIconsAndVisibleHints(){val c=start();val a=c.get();assertTrue(all(field(a,"addressHost") as View).none{it.tag==0x7f0f0108});BrowserTestActions.newTab(a);for(name in listOf("Back","Forward")){val button=views(a).first{it.contentDescription==name};assertTrue(button.isShown);assertFalse(button.isEnabled);assertTrue(button.alpha<.5f);assertTrue(all(button).filter{it.tag==0x7f0f0108}.all{it.isShown})};shot(a,"dim-history-visible-hints");c.pause().stop().destroy()}
  @Test fun compactTabsOnlyShowActiveTouchClose(){val c=start(30);val a=c.get();val row=field(a,"tabRow") as ViewGroup;val chips=all(row).filter{it.getTag(0x7f0f0101)!=null};assertTrue(chips.isNotEmpty());assertEquals(1,all(row).count{it.getTag(0x7f0f0107)!=null});val close=all(row).single{it.getTag(0x7f0f0107)!=null};assertTrue(close.isShown);assertFalse(close.isFocusable);assertNull(close.background);assertTrue((field(a,"jumpHints") as List<*>).isEmpty());shot(a,"compact-active-close-only");c.pause().stop().destroy()}
  @Test fun overviewStartsOnCurrentTabAndRevealsItRatherThanNewTab(){val c=start(9);val a=c.get();call(a,"switchTab",7);BrowserTestActions.openTabs(a);TestFrameClock.advance(Duration.ofMillis(360));settle(a);val focus=a.window.decorView.findFocus()!!;assertEquals(7,focus.getTag(0x7f0f0101));assertFalse(focus.contentDescription=="New tab");val horizontal=views(a).filterIsInstance<HorizontalScrollView>().single{it.contentDescription=="Horizontal tab overview"};assertTrue(horizontal.scrollX>0);shot(a,"overview-current-tab-selected");c.pause().stop().destroy()}
  @Test fun bUsesHistoryAndXClosesAfterShoulderSelection(){val c=start(3);val a=c.get();key(a,105);val current=(field(a,"tabs") as List<*>)[1];assertTrue((field(a,"legendHost") as View).contentDescription.toString().contains("B Back"));key(a,97);assertEquals(3,count(a));assertTrue((field(a,"tabs") as List<*>).contains(current));key(a,99);assertEquals(2,count(a));assertFalse((field(a,"tabs") as List<*>).contains(current));c.pause().stop().destroy()}

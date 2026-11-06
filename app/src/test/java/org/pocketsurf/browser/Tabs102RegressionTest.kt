@@ -21,8 +21,35 @@ import java.time.Duration
 @Config(sdk=[33],qualifiers="w960dp-h540dp-land-mdpi",shadows=[RecordingWebViewShadow::class])
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class Tabs102RegressionTest {
+ @Test fun backLeavesSurfBarBeforeExitingWithNoTabs() {
+  val activity = start(3)
+  val browser = activity.get()
+  BrowserTestActions.openTabs(browser)
+  click(browser, "Close all tabs")
+  key(browser, 97)
+  for (backKey in listOf(97, KeyEvent.KEYCODE_BACK)) {
+   key(browser, 100)
+   assertEquals(true, BrowserTestActions.field(browser, "surfBarActive"))
+   key(browser, backKey)
+   assertEquals(false, BrowserTestActions.field(browser, "surfBarActive"))
+   assertFalse(browser.isFinishing)
+  }
+  activity.pause().stop().destroy()
+ }
+ @Test fun yClosesAllTabsAndUndoRestoresThem() {
+  val activity = start(3)
+  val browser = activity.get()
+  BrowserTestActions.openTabs(browser)
+  assertTrue(views(browser).any { it.contentDescription?.toString()?.contains("Y Close all tabs") == true })
+  key(browser, 100)
+  assertEquals(-1, active(browser))
+  assertFalse(views(browser).any { it.contentDescription?.toString()?.contains("Y Close all tabs") == true })
+  click(browser, "Undo")
+  assertEquals(2, active(browser))
+  activity.pause().stop().destroy()
+ }
  private val prefs get()=RuntimeEnvironment.getApplication().getSharedPreferences("browser",0)
- @Before fun fixture(){prefs.edit().clear().putBoolean(SetupActivity.COMPLETE,true).commit();RecordingWebViewShadow.clearEvidence()}
+ @Before fun fixture(){prefs.edit().clear().putBoolean("setup_complete",true).commit();RecordingWebViewShadow.clearEvidence()}
  private fun all(v:View):List<View> = listOf(v)+if(v is ViewGroup)(0 until v.childCount).flatMap{all(v.getChildAt(it))}else emptyList()
  private fun views(a:BrowserActivity)=all(a.window.decorView)
  private fun settle(a:BrowserActivity){val config=a.resources.configuration;repeat(3){views(a).forEach{it.forceLayout()};a.window.decorView.apply{measure(View.MeasureSpec.makeMeasureSpec(config.screenWidthDp,View.MeasureSpec.EXACTLY),View.MeasureSpec.makeMeasureSpec(config.screenHeightDp,View.MeasureSpec.EXACTLY));layout(0,0,config.screenWidthDp,config.screenHeightDp)};TestFrameClock.advance(Duration.ofMillis(16))}}

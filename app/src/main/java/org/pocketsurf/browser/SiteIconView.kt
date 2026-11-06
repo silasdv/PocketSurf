@@ -25,6 +25,15 @@ class SiteIconView(context:Context,val url:String,val sizePx:Int,val dark:Boolea
   refresh(null)
  }
  fun refresh(bitmap:Bitmap?) {
+  if(url=="pocketsurf:new-tab") {
+   artwork.visibility=GONE
+   initial.visibility=VISIBLE
+   initial.text="PS"
+   initial.textSize=sizePx/context.resources.displayMetrics.scaledDensity*.42f
+   initial.setTextColor(Color.BLACK)
+   background=tile(Color.WHITE)
+   return
+  }
   val valid=bitmap?.takeUnless{it.isRecycled}
   if(valid==null){
    artwork.setImageDrawable(null);artwork.visibility=GONE;initial.visibility=VISIBLE
