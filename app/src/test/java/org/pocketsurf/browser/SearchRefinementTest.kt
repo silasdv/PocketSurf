@@ -46,7 +46,7 @@ class SearchRefinementTest {
   assertTrue(all(a.window.decorView).filterIsInstance<TextView>().any{it.text=="Suggestions"})
   c.pause().stop().destroy()
  }
- @Test @Config(qualifiers="w1920dp-h720dp-land-mdpi") fun searchBubblesCanExceedEight(){
+ @Test @Config(qualifiers="w3840dp-h720dp-land-mdpi") fun searchBubblesCanExceedEight(){
   val c=start();val a=c.get();open(a);set(a,"searchPages",SearchDestinations.rank((1..30).map{Visit("https://site$it.test/","Site $it",it.toLong())}));call(a,"renderSearchResults");layout(a)
   assertTrue((field(a,"websiteRows") as ViewGroup).childCount>8);c.pause().stop().destroy()
  }

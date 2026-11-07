@@ -51,7 +51,7 @@ class SettingsDashboard(
  private var cursorX=0f;private var cursorY=0f
  private var help=false
  private fun d(n:Int)=(n*resources.displayMetrics.density).roundToInt()
- private val controlHeight=if(resources.configuration.screenHeightDp>=480)40 else 28
+ private val controlHeight=28
  private fun lp(w:Int=-1,h:Int=32)=LayoutParams(if(w<0)w else d(w),if(h<0)h else d(if(h==32)controlHeight else h))
  private fun label(s:String,size:Float=12f,color:Int=colors.text)=TextView(context).apply{text=s;textSize=if(size==12f&&controlHeight>=44)14f else size;setTextColor(color);gravity=Gravity.CENTER_VERTICAL;includeFontPadding=false;maxLines=1;ellipsize=TextUtils.TruncateAt.END}
  private fun row()=LinearLayout(context).apply{orientation=HORIZONTAL;gravity=Gravity.CENTER_VERTICAL;isBaselineAligned=false}
@@ -71,7 +71,7 @@ class SettingsDashboard(
   }, lp(16, 16).apply { rightMargin = d(6) })
  }
  private fun box()=row().apply{background=surface();setPadding(d(10),0,d(10),0)}
- private val rowGap = if (resources.configuration.screenHeightDp >= 480) 12 else 4
+ private val rowGap = 4
  private fun panel(color: Int) = GradientDrawable().apply {
   setColor(color)
   cornerRadius = d(12).toFloat()
@@ -119,7 +119,6 @@ class SettingsDashboard(
  fun select(key:String,enter:Boolean=false){if(key !in categories)return;endSlider();recording=null;pending=null;test=false;category=key;action("category",key);render();if(enter)enterPane()}
  private fun enterPane(){focus(remembered[category]?:nodes.firstOrNull{it.col>0&&it.row>=0}?.id?:return)}
  private fun render(restore:Boolean=false){
-  body.expandRows=category!="browsing"
   val previous=current?.id;building=true;forget(pane);nodes.removeAll{it.col>0};pane.removeAllViews();body.removeAllViews();preferredRowHeights.clear();sliderIds.clear();choiceIds.clear();group=null;footer.removeAllViews();preview=null;cursor=null
   categories.keys.forEachIndexed{i,key->val v=rail.getChildAt(i) as ViewGroup;(v.getChildAt(1) as TextView).setTextColor(if(key==category)colors.accent else colors.text);v.contentDescription="Category: $key"}
   pane.addView(label(categories.getValue(category),19f).apply{typeface=android.graphics.Typeface.DEFAULT_BOLD;contentDescription="Settings section heading"},lp(-1,24).apply{bottomMargin=d(4)})
@@ -147,7 +146,7 @@ class SettingsDashboard(
   val v=box();settingIcons[title]?.let{v.addIcon(it)};v.addView(label(title),LayoutParams(0,-1,1f));if(title=="Page zoom")v.addIcon("zoom-out");val number=label("$value%",11f,colors.secondary).apply{gravity=Gravity.END or Gravity.CENTER_VERTICAL};val slider=SeekBar(context).apply{contentDescription="$title slider";this.max=max-min;progress=value-min;keyProgressIncrement=step;isFocusable=false;progressTintList=ColorStateList.valueOf(colors.secondary);thumbTintList=ColorStateList.valueOf(colors.secondary)}
   slider.setOnSeekBarChangeListener(object:SeekBar.OnSeekBarChangeListener{override fun onProgressChanged(b:SeekBar,n:Int,user:Boolean){number.text="${n+min}%";change(n+min)};override fun onStartTrackingTouch(b:SeekBar){};override fun onStopTrackingTouch(b:SeekBar){}})
   v.addView(slider,LayoutParams(0,-1,1.4f));v.addView(number,lp(42,-1));if(title=="Page zoom"){v.addView(Space(context),lp(8,1));v.addIcon("zoom-in")};sliderIds.add(title);node(v,title,r,adjust={slider.progress=(slider.progress+it*step).coerceIn(0,slider.max)},click={if(editingSlider==title)endSlider()else{editingSlider=title;activeSeekBar=slider;slider.progressTintList=ColorStateList.valueOf(colors.accent);slider.thumbTintList=ColorStateList.valueOf(colors.accent);action("slider_edit",title)}})
-  if(category in listOf("mouse","appearance")){val oldCaption=v.getChildAt(0);v.removeView(oldCaption);val caption=settingHeading(title);val stack=LinearLayout(context).apply{orientation=VERTICAL};stack.addView(caption,lp(-1,18));stack.addView(v,lp(-1,28).apply{topMargin=d(4)});line(stack,50)}else line(v)
+  if(category in listOf("mouse","appearance")){val oldCaption=v.getChildAt(0);v.removeView(oldCaption);val caption=settingHeading(title);val stack=LinearLayout(context).apply{orientation=VERTICAL};stack.addView(caption,lp(-1,18));stack.addView(v,lp(-1,28).apply{topMargin=d(4)});line(stack,50);stack.layoutParams=stack.layoutParams.apply{height=d(18)+d(4)+d(28)}}else line(v)
  }
  private fun optionHeading(title:String){
   if(group==null)sectionHeading("", "")

@@ -4,13 +4,17 @@
 
 PocketSurf is an Android browser for landscape gaming handhelds. Browse with a gamepad, switch to a virtual mouse for hover menus, or tap any browser action directly. It runs on Android 8.0 and newer using Android System WebView.
 
-[Download PocketSurf 1.4.0](https://github.com/silasdv/PocketSurf/releases/download/v1.4.0/PocketSurf-1.4.0.apk) · [Changelog](CHANGELOG.md)
+[Download PocketSurf 1.4.1](https://github.com/silasdv/PocketSurf/releases/download/v1.4.1/PocketSurf-1.4.1.apk) · [Changelog](CHANGELOG.md)
 
 ## Start browsing
 
 Install the signed APK, then open PocketSurf. Each launcher start adds a new tab and opens the keyboard. Enter an address or search with Google. To update a previous public release, install the APK over the existing app. Android requires matching signing keys for an in-place update.
 
 The Search screen shows recent searches and frequently visited websites. Each website shortcut opens the page you visit most on that site. While you type, PocketSurf sends text to Google for autocomplete. Saved bookmarks and browsing history are stored locally. [Privacy details](PRIVACY.md)
+
+## Display and TV support
+
+The native interface scales proportionally across 16:9 and 4:3 windows. Android TV launcher integration and D-pad-center navigation are included. Website rendering and system keyboards retain their own sizing. Physical Android TV acceptance testing is still pending. See the release notes for the known Inlay keyboard issue after forced resolution changes.
 
 ## Controller guide
 

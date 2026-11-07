@@ -14,7 +14,7 @@ class ControllerBindings(private val prefs:SharedPreferences){
  init {if(!prefs.getBoolean("inline_controls_v1",false)){val legacy=Control.entries.associateWith{if(it==Control.SEARCH)108 else if(it==Control.MENU)109 else it.defaultKey};val custom=Control.entries.filter{prefs.contains("key_${it.name}")&&prefs.getInt("key_${it.name}",legacy.getValue(it))!=legacy.getValue(it)};val assigned=mutableMapOf<Control,Int>();custom.forEach{assigned[it]=prefs.getInt("key_${it.name}",legacy.getValue(it))};Control.entries.filter{it !in custom}.forEach{action->val key=listOf(action.defaultKey,legacy.getValue(action)).plus((96..110)+(188..203)+(19..23)).first{it !in assigned.values};assigned[action]=key};prefs.edit().apply{assigned.forEach{(a,k)->putInt("key_${a.name}",k)};putBoolean("inline_controls_v1",true);putInt("controls_layout_version",2)}.apply()}}
 
  fun key(action:Control)=prefs.getInt("key_${action.name}",action.defaultKey)
- fun action(key:Int)=Control.entries.firstOrNull {this.key(it)==key}
+ fun action(key:Int)=Control.entries.firstOrNull {this.key(it)==key}?:if(key==KeyEvent.KEYCODE_DPAD_CENTER)Control.CONFIRM else null
  fun assign(action:Control,key:Int){val old=this.key(action);val occupied=Control.entries.firstOrNull {it!=action&&this.key(it)==key};prefs.edit().apply {putInt("key_${action.name}",key);if(occupied!=null)putInt("key_${occupied.name}",old)}.apply()}
  fun reset(){prefs.edit().apply {Control.entries.forEach {remove("key_${it.name}")}}.apply()}
  fun label(action:Control)=labelForKey(key(action))

@@ -29,7 +29,7 @@ class SiteIconView(context:Context,val url:String,val sizePx:Int,val dark:Boolea
    artwork.visibility=GONE
    initial.visibility=VISIBLE
    initial.text="PS"
-   initial.textSize=sizePx/context.resources.displayMetrics.scaledDensity*.42f
+   initial.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX,sizePx*.42f)
    initial.setTextColor(Color.BLACK)
    background=tile(Color.WHITE)
    return
@@ -37,7 +37,7 @@ class SiteIconView(context:Context,val url:String,val sizePx:Int,val dark:Boolea
   val valid=bitmap?.takeUnless{it.isRecycled}
   if(valid==null){
    artwork.setImageDrawable(null);artwork.visibility=GONE;initial.visibility=VISIBLE
-   val identity=identity(url);initial.text=identity.first;initial.textSize=(sizePx/context.resources.displayMetrics.scaledDensity*.48f)
+   val identity=identity(url);initial.text=identity.first;initial.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX,sizePx*.48f)
    background=tile(identity.second)
   }else{
    initial.visibility=GONE;artwork.visibility=VISIBLE;artwork.setImageBitmap(valid)

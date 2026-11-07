@@ -10,7 +10,7 @@ val releaseStore=signingValue("POCKETSURF_KEYSTORE_PATH","storeFile")
 android {
  namespace="org.pocketsurf.browser"; compileSdk=35
  buildFeatures { buildConfig=true }
- defaultConfig { applicationId="org.pocketsurf.browser"; minSdk=26; targetSdk=35; versionCode=43; versionName="1.4.0" }
+ defaultConfig { applicationId="org.pocketsurf.browser"; minSdk=26; targetSdk=35; versionCode=44; versionName="1.4.1" }
  compileOptions { sourceCompatibility=JavaVersion.VERSION_17; targetCompatibility=JavaVersion.VERSION_17 }
  kotlinOptions { jvmTarget="17" }
  signingConfigs.getByName("debug") { storeFile=rootProject.file(".local/debug.keystore") }
