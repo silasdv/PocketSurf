@@ -4,7 +4,7 @@
 
 PocketSurf is an Android browser for landscape gaming handhelds. Browse with a gamepad, switch to a virtual mouse for hover menus, or tap any browser action directly. It runs on Android 8.0 and newer using Android System WebView.
 
-[Download PocketSurf 1.4.1](https://github.com/silasdv/PocketSurf/releases/download/v1.4.1/PocketSurf-1.4.1.apk) · [Changelog](CHANGELOG.md)
+[Download PocketSurf 1.4.2](https://github.com/silasdv/PocketSurf/releases/download/v1.4.2/PocketSurf-1.4.2.apk) · [Changelog](CHANGELOG.md)
 
 ## Start browsing
 

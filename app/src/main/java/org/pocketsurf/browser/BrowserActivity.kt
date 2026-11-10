@@ -1012,7 +1012,7 @@ open class BrowserActivity : Activity() {
   searchWasSurfBar=surfBarActive;if(!surfBarActive)enterSurfBar(true);interactionEpoch++;hover.leave();closePopup();stopInput();webEditing=false
   addressSavedNodes=focusNodes.toList();addressSavedFocus=focused;focusNodes=focusNodes.filter{it.view===addressField}.toMutableList()
   searchTarget=target;searchReturn=onReturn;addressEditing=true;addressKeyboardDismissed=false;chromeFocus=true;toolbar.visibility=View.VISIBLE;tabNavigation.visibility=View.VISIBLE
-  searchPages=emptyList();recentQueries=emptyList();searchCompletions=emptyList();searchSuggestionQuery=""
+  searchPages=emptyList();recentQueries=if(isPrivateSession)emptyList()else data.recentSearches().map{it.title};searchCompletions=emptyList();searchSuggestionQuery=""
   ensureSearchScreen();animateSearch(true);refreshSearchHistory()
   addressField.showSoftInputOnFocus=true;addressField.setText(typed?:target?.takeUnless{it.home}?.url.orEmpty());addressField.requestFocus();addressField.selectAll();focused=addressField;imeExpected=true;editRequestedAt=SystemClock.uptimeMillis();updateAddressAction()
   pendingAddressKeyboard=true
@@ -1065,6 +1065,9 @@ open class BrowserActivity : Activity() {
  private fun refreshSearchHistory(){
   if(!addressEditing)return
   val session=++searchHistorySession
+  val syncRecent=if(isPrivateSession)emptyList()else data.recentSearches().map{it.title}
+  recentQueries=syncRecent
+  if(addressField.text.isBlank())searchCompletions=syncRecent
   searchWorker.execute{
    val history=if(isPrivateSession)emptyList()else data.entries("history")
    val pages=SearchDestinations.rank(history)
@@ -1141,14 +1144,22 @@ open class BrowserActivity : Activity() {
   if(query==searchSuggestionQuery&&query.isNotEmpty())return
   searchSuggestionQuery=query;val epoch=++searchEpoch;suggestionInputAt=SystemClock.elapsedRealtime()
   suggestionJob?.let{handler.removeCallbacks(it)};autocomplete.cancel()
-  searchCompletions=if(query.isBlank())recentQueries else autocomplete.cached(query)?.items.orEmpty()
+  val isBlank=query.isBlank()
+  if(isBlank){
+   if(recentQueries.isEmpty()&&!isPrivateSession){
+    recentQueries=data.recentSearches().map{it.title}
+   }
+   searchCompletions=recentQueries
+  }else{
+   searchCompletions=autocomplete.cached(query)?.items.orEmpty()
+  }
   renderSearchResults()
-  if(query.isBlank()||autocomplete.cached(query)!=null)return
+  if(isBlank||autocomplete.cached(query)!=null)return
   val inputAt=suggestionInputAt
   val job=Runnable{
    val scheduledAt=SystemClock.elapsedRealtime()
    autocomplete.request(query){result->runOnUiThread{
-    if(addressEditing&&epoch==searchEpoch){
+    if(addressEditing&&epoch==searchEpoch&&addressField.text.toString().trim()==query){
      val dispatchAt=SystemClock.elapsedRealtime()
      searchCompletions=result.items;renderSearchResults()
      if(BuildConfig.DEBUG)android.util.Log.d("PocketSurfSearch","debounceMs=${scheduledAt-inputAt} networkMs=${result.networkMs} parseMs=${result.parseMs} uiQueueMs=${dispatchAt-scheduledAt-result.networkMs-result.parseMs} renderMs=${SystemClock.elapsedRealtime()-dispatchAt} totalMs=${SystemClock.elapsedRealtime()-inputAt} cached=${result.cached} rows=${result.items.size}")
@@ -1607,7 +1618,9 @@ open class BrowserActivity : Activity() {
   t.desktopScript=DesktopBrowsing.apply(this,globalPageZoom());t.zoomPercent=globalPageZoom();settings.textZoom=textZoom(t.url);settings.javaScriptEnabled=true;settings.domStorageEnabled=true;settings.allowFileAccess=false;settings.allowContentAccess=true;settings.mixedContentMode=WebSettings.MIXED_CONTENT_NEVER_ALLOW;settings.safeBrowsingEnabled=true
   settings.setSupportZoom(true);settings.builtInZoomControls=true;settings.displayZoomControls=false;settings.mediaPlaybackRequiresUserGesture=true;settings.setSupportMultipleWindows(true);settings.javaScriptCanOpenWindowsAutomatically=false
   setFindListener{index,total,done->if(this===web&&::findCount.isInitialized&&findBar.visibility==View.VISIBLE){findCount.text=if(total>0)"${index+1}/$total"else"0/0";findCount.contentDescription="Match count";if(Build.VERSION.SDK_INT>=30)findCount.stateDescription=findCount.text.toString()}}
-  importantForAutofill=if(isPrivateSession)View.IMPORTANT_FOR_AUTOFILL_NO_EXCLUDE_DESCENDANTS else View.IMPORTANT_FOR_AUTOFILL_YES;CookieManager.getInstance().setAcceptThirdPartyCookies(this,false)
+  importantForAutofill=if(isPrivateSession)View.IMPORTANT_FOR_AUTOFILL_NO_EXCLUDE_DESCENDANTS else View.IMPORTANT_FOR_AUTOFILL_YES
+  CookieManager.getInstance().setAcceptCookie(true)
+  CookieManager.getInstance().setAcceptThirdPartyCookies(this,true)
   webViewClient=object:WebViewClient(){
    override fun shouldInterceptRequest(v:WebView,r:WebResourceRequest):WebResourceResponse?=if(adblock.shouldBlock(r.url.toString(),popupOrigins[t.id]?:t.url,r.isForMainFrame&&!popupOrigins.containsKey(t.id)))WebResourceResponse("text/plain","UTF-8",java.io.ByteArrayInputStream(ByteArray(0)))else null
    override fun shouldOverrideUrlLoading(v:WebView,r:WebResourceRequest):Boolean {if(r.url.scheme in listOf("http","https"))return false;if(r.isForMainFrame&&r.hasGesture())confirm("Open external app?","This link uses ${r.url.scheme}.",{showPage();try {startActivity(Intent(Intent.ACTION_VIEW,r.url).addCategory(Intent.CATEGORY_BROWSABLE))}catch(_:Exception){toast("No app can open this link")}},{showPage()},"Open app");return true}
@@ -1678,7 +1691,7 @@ open class BrowserActivity : Activity() {
  }
  private fun share(url:String){try {startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT,url),"Share page"))}catch(_:Exception){toast("Sharing is unavailable")}}
  private fun toast(message:String)=Toast.makeText(this,message,Toast.LENGTH_SHORT).show()
- override fun onPause(){customEvent(tab,androidx.browser.customtabs.CustomTabsCallback.TAB_HIDDEN);interactionEpoch++;hover.leave();resumed=false;Choreographer.getInstance().removeFrameCallback(frame);frameScheduled=false;handler.removeCallbacks(maintenance);stopInput();capturePreview();saveSession();web?.onPause();super.onPause()}
+ override fun onPause(){customEvent(tab,androidx.browser.customtabs.CustomTabsCallback.TAB_HIDDEN);interactionEpoch++;hover.leave();resumed=false;Choreographer.getInstance().removeFrameCallback(frame);frameScheduled=false;handler.removeCallbacks(maintenance);stopInput();capturePreview();saveSession();CookieManager.getInstance().flush();web?.onPause();super.onPause()}
  override fun onResume(){super.onResume();customEvent(tab,androidx.browser.customtabs.CustomTabsCallback.TAB_SHOWN);resumed=true;lastFrame=0;stopInput();requestHighRefreshRate();Choreographer.getInstance().removeFrameCallback(frame);frameScheduled=false;lastInputTime=SystemClock.uptimeMillis();scheduleFrame();handler.removeCallbacks(maintenance);handler.postDelayed(maintenance,750);if(screen=="page"){web?.onResume();updateChrome()};if(!isPrivateSession)handler.postDelayed({(application as? SurfApplication)?.cleanupAbandonedPrivate()},750)}
  override fun onDestroy(){prefs.unregisterOnSharedPreferenceChangeListener(dataChanges);addressEditing=false;searchEpoch++;searchHistorySession++;searchMotion?.removeAllListeners();searchMotion?.cancel();autocomplete.clear();searchWorker.shutdownNow();if(previewCacheHolder.isInitialized())previewCache.close();generatedTransfer?.close();pendingPermission?.deny();pendingPermission=null;Choreographer.getInstance().removeFrameCallback(frame);hideVideo();favicons.close();adblock.close();getSystemService(android.hardware.input.InputManager::class.java).unregisterInputDeviceListener(deviceListener);handler.removeCallbacksAndMessages(null);closePopup(false);clearClosingPopups();prompt?.dismiss();tabs.forEach{it.desktopScript?.remove();it.desktopScript=null;it.view?.destroy()};fileCallback?.onReceiveValue(null);super.onDestroy();if(isPrivateSession&&(application as? SurfApplication)?.privateProcess==true&&isFinishing&&!isChangingConfigurations)handler.postDelayed({android.os.Process.killProcess(android.os.Process.myPid())},150)}
  private var pendingAddressKeyboard=false

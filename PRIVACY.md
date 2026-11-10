@@ -10,6 +10,6 @@ Private browsing on Android 9+ uses a separate process/WebView profile. Temporar
 
 INTERNET supports browsing. Camera/microphone runtime access is requested only after an HTTPS site requests it and you approve its prompt. Only approved resources are granted. No broad storage permission is needed; supported generated downloads use Android's document picker.
 
-Sharing a page or opening a saved file passes selected content to the chosen Android handler. GitHub/Ko-fi links are optional. Certificate errors are rejected; mixed content and third-party cookies are disabled. Plain HTTP is unencrypted.
+Sharing a page or opening a saved file passes selected content to the chosen Android handler. GitHub/Ko-fi links are optional. Certificate errors are rejected; mixed content is disabled. First-party and third-party cookies are enabled, including in the separate private profile. Embedded third parties can store cross-site identifiers. Cookies are flushed to storage when the app pauses. Plain HTTP is unencrypted.
 
 Adblocking/cookie helpers are limited and do not promise complete tracking prevention. Keep WebView updated and use per-site exceptions if needed.

@@ -76,4 +76,37 @@ class SearchScreenRegressionTest {
   assertTrue((field(a,"goButton") as View).isEnabled);assertTrue((field(a,"goButton") as View).performClick());settle(a);assertEquals(false,field(a,"addressEditing"));assertNull(field(a,"suggestions"));assertEquals("https://fixture.test/path",(call(a,"getTab") as BrowserActivity.Tab).url)
   c.pause().stop().destroy()
  }
+ @Test fun emptyInputDisplaysRecentSearchesImmediatelyAndThirdPartyCookiesEnabled(){
+  val data=BrowserData(RuntimeEnvironment.getApplication().getSharedPreferences("browser",0))
+  data.recordSearch("Android WebView performance","https://www.google.com/search?q=Android+WebView+performance",10)
+  data.recordSearch("Retroid Pocket 6","https://www.google.com/search?q=Retroid+Pocket+6",20)
+  data.recordSearch("Hollow Knight mods","https://www.google.com/search?q=Hollow+Knight+mods",30)
+  data.recordSearch("Kotlin tutorials","https://www.google.com/search?q=Kotlin+tutorials",40)
+  val c=Robolectric.buildActivity(BrowserActivity::class.java,Intent(Intent.ACTION_VIEW,Uri.parse("https://fixture.test/"))).setup().visible();val a=c.get();settle(a)
+  call(a,"showSearch",call(a,"getTab"),null,"");settle(a)
+  val input=field(a,"addressField") as EditText;input.setText("");settle(a)
+  val rows=field(a,"googleRows") as ViewGroup
+  assertTrue(rows.childCount>=4)
+  assertEquals("Kotlin tutorials",(rows.getChildAt(0) as SearchSuggestionView).query)
+  assertEquals("Hollow Knight mods",(rows.getChildAt(1) as SearchSuggestionView).query)
+  assertEquals("Retroid Pocket 6",(rows.getChildAt(2) as SearchSuggestionView).query)
+  assertEquals("Android WebView performance",(rows.getChildAt(3) as SearchSuggestionView).query)
+  assertTrue((rows.getChildAt(0) as SearchSuggestionView).recent)
+
+  input.setText("kotlin")
+  set(a,"searchCompletions",listOf("kotlin coroutines","kotlin documentation"))
+  call(a,"renderSearchResults");settle(a)
+  assertEquals("kotlin coroutines",(rows.getChildAt(0) as SearchSuggestionView).query)
+  assertFalse((rows.getChildAt(0) as SearchSuggestionView).recent)
+
+  input.setText("")
+  settle(a)
+  assertEquals("Kotlin tutorials",(rows.getChildAt(0) as SearchSuggestionView).query)
+  assertTrue((rows.getChildAt(0) as SearchSuggestionView).recent)
+
+  val web=call(a,"getWeb") as android.webkit.WebView
+  assertNotNull(web)
+  assertTrue(android.webkit.CookieManager.getInstance().acceptCookie())
+  c.pause().stop().destroy()
+ }
 }
