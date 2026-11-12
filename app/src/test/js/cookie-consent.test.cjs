@@ -76,3 +76,11 @@ test('additional known CMP reject controls work without accepting consent',()=>{
 
 test('current Twitch affirmative toggles are disabled and necessary controls remain untouched',()=>{const f=twitchPreferences([['',true],['',false],['',true]]);f.boxes.forEach(b=>b.getAttribute=k=>k==='data-a-target'?'tw-toggle':null);f.boxes[2].disabled=true;f.tick(150);assert.equal(f.boxes[0].checked,false);assert.equal(f.boxes[1].checked,false);assert.equal(f.boxes[2].checked,true);assert.equal(f.boxes[2].clicks,0);assert.equal(f.save.clicks,1)});
 test('Usercentrics open shadow-root rejection works with a zero-sized host',()=>{const f=fixture();const {root,button}=f.banner('#usercentrics-root','unused');root.getBoundingClientRect=()=>({width:0,height:0});root.shadowRoot={querySelectorAll:s=>s==='[data-testid="uc-deny-all-button"]'?[button]:[]};f.api.configure(true);f.tick(150);assert.equal(button.clicks,1)});
+test('Google dialog controls are never clicked automatically after search loads',()=>{
+  const f=fixture();
+  const {button}=f.banner('#consent-bump, #lb, div[role="dialog"]','#W0wltc, button[jsname="t2A38e"], button[jsname="Z29S9b"]');
+  f.api.configure(true);
+  f.tick(150);f.mutate();f.tick(350);
+  assert.equal(button.clicks,0);
+  assert.equal(f.api.status().actions,0);
+});

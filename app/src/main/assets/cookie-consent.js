@@ -12,8 +12,7 @@
     ['iubenda', '#iubenda-cs-banner', '.iubenda-cs-reject-btn'],
     ['Didomi', '#didomi-host', '#didomi-notice-disagree-button'],
     ['Complianz', '.cmplz-cookiebanner', '.cmplz-deny'],
-    ['Usercentrics', '#usercentrics-root', '[data-testid="uc-deny-all-button"]'],
-    ['Google', '#consent-bump, #lb, div[role="dialog"]', '#W0wltc, button[jsname="t2A38e"], button[jsname="Z29S9b"]']
+    ['Usercentrics', '#usercentrics-root', '[data-testid="uc-deny-all-button"]']
   ];
   const clicked = new WeakSet();
   let enabled = false, observer = null, scheduled = 0, deadline = 0;
